@@ -63,8 +63,6 @@ Users can:
   - **Things to know** — common concerns or points to keep in mind
   - **Dishes to try** — dishes that are frequently recommended by customers
 
-The review summary helps users quickly understand the most important aspects of a restaurant without having to read through individual reviews.
-
 Each restaurant can have **multiple selected TikTok videos**, which may come from the restaurant itself, food reviewers, or customers. These videos give users a more realistic idea of the food and atmosphere before visiting.
 
 ---
