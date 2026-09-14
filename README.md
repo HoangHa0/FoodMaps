@@ -41,7 +41,9 @@ FoodMaps provides an interactive map of restaurants and cafés in Hanoi.
 Users can:
 
 - Explore restaurants directly on the map.
+
 - Click on a map pin to open the restaurant sidebar.
+
 - View basic information such as:
   - Restaurant name
   - Photos
@@ -51,8 +53,17 @@ Users can:
   - Menu
 
 - Watch selected TikTok videos related to the restaurant.
+
 - Access the restaurant's Facebook and Instagram pages.
+
 - Save restaurants for later.
+
+- View a **review summary tab** that highlights key information from customer reviews, including:
+  - **Strengths** — what customers like most about the place
+  - **Things to know** — common concerns or points to keep in mind
+  - **Dishes to try** — dishes that are frequently recommended by customers
+
+The review summary helps users quickly understand the most important aspects of a restaurant without having to read through individual reviews.
 
 Each restaurant can have **multiple selected TikTok videos**, which may come from the restaurant itself, food reviewers, or customers. These videos give users a more realistic idea of the food and atmosphere before visiting.
 
@@ -92,6 +103,8 @@ FoodMaps uses AI to organize review information into several practical aspects:
 - **Service** — staff attitude and service quality
 
 The system can also identify frequently mentioned positive dishes and provide suggestions for **“Dishes You May Want to Try.”**
+
+- The analysis results are displayed directly in the **review summary tab** of the restaurant sidebar (see Section 1).
 
 This gives users a quick overview of what customers actually like about a place without requiring them to read every review.
 
