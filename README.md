@@ -41,24 +41,20 @@ FoodMaps provides an interactive map of restaurants and cafés in Hanoi.
 Users can:
 
 - Explore restaurants directly on the map.
-
 - Click on a map pin to open the restaurant sidebar.
-
 - View basic information such as:
+
   - Restaurant name
   - Photos
   - Opening hours
   - Price range
   - Rating
   - Menu
-
 - Watch selected TikTok videos related to the restaurant.
-
 - Access the restaurant's Facebook and Instagram pages.
-
 - Save restaurants for later.
-
 - View a **review summary tab** that highlights key information from customer reviews, including:
+
   - **Strengths** — what customers like most about the place
   - **Things to know** — common concerns or points to keep in mind
   - **Dishes to try** — dishes that are frequently recommended by customers
@@ -230,19 +226,19 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · design decisions: [
 
 ## 🛠️ Technology Stack
 
-| Component           | Technology                                   |
-| ------------------- | -------------------------------------------- |
-| **Frontend**        | Next.js (React, TypeScript), TailwindCSS     |
-| **Map**             | Google Maps JavaScript API                   |
-| **Backend**         | FastAPI, Python, SQLAlchemy, Alembic         |
-| **Database**        | PostgreSQL                                   |
-| **Geospatial Data** | PostGIS                                      |
-| **Vector Search**   | pgvector                                     |
-| **Text Embeddings** | sentence-transformers                        |
-| **AI / NLP**        | Gemini API                                   |
-| **Restaurant Data** | Google Places API                            |
-| **Social Content**  | TikTok, Facebook, Instagram                  |
-| **Tooling**         | uv (Python), npm (Node.js), Docker, make      |
+| Component                 | Technology                               |
+| ------------------------- | ---------------------------------------- |
+| **Frontend**        | Next.js (React, TypeScript), TailwindCSS |
+| **Map**             | Google Maps JavaScript API               |
+| **Backend**         | FastAPI, Python, SQLAlchemy, Alembic     |
+| **Database**        | PostgreSQL                               |
+| **Geospatial Data** | PostGIS                                  |
+| **Vector Search**   | pgvector                                 |
+| **Text Embeddings** | sentence-transformers                    |
+| **AI / NLP**        | Gemini API                               |
+| **Restaurant Data** | Google Places API                        |
+| **Social Content**  | TikTok, Facebook, Instagram              |
+| **Tooling**         | uv (Python), npm (Node.js), Docker, make |
 
 ---
 
@@ -282,13 +278,13 @@ Windows (installed with Git for Windows).
 
 ### 1. Prerequisites
 
-| Tool | Version | Notes |
-| --- | --- | --- |
-| Git | recent | Windows: [Git for Windows](https://git-scm.com/download/win), which includes Git Bash |
-| GNU make | any | Linux/macOS: usually preinstalled. Windows: `winget install ezwinports.make` |
-| [uv](https://docs.astral.sh/uv/) | ≥ 0.8 | Python package manager; downloads the right Python (3.12) automatically |
-| Node.js | 22 LTS or newer | https://nodejs.org |
-| Docker | Docker Desktop / Engine | Runs PostgreSQL + PostGIS + pgvector |
+| Tool                            | Version                 | Notes                                                                                 |
+| ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
+| Git                             | recent                  | Windows: [Git for Windows](https://git-scm.com/download/win), which includes Git Bash |
+| GNU make                        | any                     | Linux/macOS: usually preinstalled. Windows:`winget install ezwinports.make`         |
+| [uv](https://docs.astral.sh/uv/) | ≥ 0.8                  | Python package manager; downloads the right Python (3.12) automatically               |
+| Node.js                         | 22 LTS or newer         | https://nodejs.org                                                                    |
+| Docker                          | Docker Desktop / Engine | Runs PostgreSQL + PostGIS + pgvector                                                  |
 
 On Windows, everything can be installed from PowerShell with winget:
 
@@ -317,15 +313,15 @@ make setup
 
 The defaults work for local development; API keys are only needed by the features that use them.
 
-| File | Variable | Purpose |
-| --- | --- | --- |
-| `backend/.env` | `DATABASE_URL` | PostgreSQL connection (defaults to the Docker database) |
-| | `JWT_SECRET` | Secret for signing login tokens: **change it** outside local development |
-| | `GOOGLE_MAPS_API_KEY` | Google Places API (server side) |
-| | `GEMINI_API_KEY` | Gemini API for review analysis |
-| | `USE_STUB_MATCH` | `true` = sample recommendations while the AI pipeline is not configured |
-| `frontend/.env.local` | `BACKEND_URL` | Where the frontend forwards `/api/*` requests (default `http://localhost:8000`) |
-| | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAP_ID` | Google Maps JavaScript API (browser side) |
+| File                    | Variable                                                           | Purpose                                                                            |
+| ----------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `backend/.env`        | `DATABASE_URL`                                                   | PostgreSQL connection (defaults to the Docker database)                            |
+|                         | `JWT_SECRET`                                                     | Secret for signing login tokens:**change it** outside local development      |
+|                         | `GOOGLE_MAPS_API_KEY`                                            | Google Places API (server side)                                                    |
+|                         | `GEMINI_API_KEY`                                                 | Gemini API for review analysis                                                     |
+|                         | `USE_STUB_MATCH`                                                 | `true` = sample recommendations while the AI pipeline is not configured          |
+| `frontend/.env.local` | `BACKEND_URL`                                                    | Where the frontend forwards`/api/*` requests (default `http://localhost:8000`) |
+|                         | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAP_ID` | Google Maps JavaScript API (browser side)                                          |
 
 For semantic search and review analysis, also install the AI dependencies:
 `cd backend && uv sync --extra ai`.
@@ -352,12 +348,12 @@ make dev
 
 ### Troubleshooting
 
-| Problem | Fix |
-| --- | --- |
-| `make` / `uv` / `node` not found | Open a new terminal; on Windows use Git Bash, not PowerShell or cmd |
-| `make db` cannot connect to Docker | Start Docker Desktop and wait until the engine is running |
-| Port 5432 already in use | Stop the local PostgreSQL service, or change the port in `docker-compose.yml` and `DATABASE_URL` |
-| Cannot run Docker | Use a hosted PostgreSQL with the `postgis` and `vector` extensions (e.g. Supabase) and set `DATABASE_URL` with the `postgresql+asyncpg://` prefix |
+| Problem                                | Fix                                                                                                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make` / `uv` / `node` not found | Open a new terminal; on Windows use Git Bash, not PowerShell or cmd                                                                                      |
+| `make db` cannot connect to Docker   | Start Docker Desktop and wait until the engine is running                                                                                                |
+| Port 5432 already in use               | Stop the local PostgreSQL service, or change the port in`docker-compose.yml` and `DATABASE_URL`                                                      |
+| Cannot run Docker                      | Use a hosted PostgreSQL with the`postgis` and `vector` extensions (e.g. Supabase) and set `DATABASE_URL` with the `postgresql+asyncpg://` prefix |
 
 ---
 
