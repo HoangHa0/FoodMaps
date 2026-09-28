@@ -1,0 +1,9 @@
+# Store text files with LF in the repository and check them out with LF everywhere
+# (including Windows), so bash, make and diffs behave the same on every machine.
+* text=auto eol=lf
+
+# Generated files: collapsed in PR diffs. On conflict, never edit by hand; regenerate instead.
+frontend/openapi.json linguist-generated=true
+frontend/src/lib/api/schema.d.ts linguist-generated=true
+backend/uv.lock linguist-generated=true
+frontend/package-lock.json linguist-generated=true

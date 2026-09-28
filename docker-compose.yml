@@ -1,0 +1,18 @@
+# Only the database runs in Docker; backend and frontend run natively (uv / npm) for fast reloads.
+#   make db   ->  PostgreSQL on localhost:5432
+services:
+  db:
+    build: ./infra/db
+    image: foodmaps-db:16
+    environment:
+      POSTGRES_USER: foodmaps
+      POSTGRES_PASSWORD: foodmaps
+      POSTGRES_DB: foodmaps
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodmaps"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:

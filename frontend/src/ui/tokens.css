@@ -1,0 +1,40 @@
+/*
+ * Design tokens: semantic names, not concrete colours.
+ * This file maps token names to Tailwind classes; actual values live in ui/themes/*.css.
+ * A new visual style = edit or add one theme file. No feature code changes.
+ *
+ *   bg-surface  text-fg-muted  border-border  bg-primary  text-primary-fg
+ *   rounded-card  rounded-control  shadow-sheet  font-display  bg-accent (matched place)
+ */
+@theme inline {
+  /* Remove Tailwind's default palette (red-500, gray-700, ...) so only token colours exist:
+     `bg-red-500` simply generates no CSS. */
+  --color-*: initial;
+
+  --color-bg: var(--fm-bg);
+  --color-surface: var(--fm-surface);
+  --color-surface-raised: var(--fm-surface-raised);
+  --color-fg: var(--fm-fg);
+  --color-fg-muted: var(--fm-fg-muted);
+  --color-border: var(--fm-border);
+  --color-primary: var(--fm-primary);
+  --color-primary-fg: var(--fm-primary-fg);
+  --color-accent: var(--fm-accent);        /* matched-place highlight / like button */
+  --color-accent-fg: var(--fm-accent-fg);
+  --color-success: var(--fm-success);
+  --color-warning: var(--fm-warning);
+  --color-danger: var(--fm-danger);
+  --color-overlay: var(--fm-overlay);
+
+  --radius-control: var(--fm-radius-control);
+  --radius-card: var(--fm-radius-card);
+  --radius-sheet: var(--fm-radius-sheet);
+
+  --shadow-card: var(--fm-shadow-card);
+  --shadow-sheet: var(--fm-shadow-sheet);
+
+  --font-sans: var(--fm-font-sans);
+  --font-display: var(--fm-font-display);
+
+  --ease-standard: var(--fm-ease);
+}

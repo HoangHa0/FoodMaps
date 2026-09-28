@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "../ui/tokens.css";
+@import "../ui/themes/default.css";
+@import "../ui/themes/warm.css";
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}

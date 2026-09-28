@@ -1,0 +1,17 @@
+/* Example theme showing that a new style is one file. Enable with ACTIVE_THEME = "warm" (ui/theme.ts). */
+[data-theme="warm"] {
+  --fm-bg: #fbf6ef;
+  --fm-surface: #fffdf9;
+  --fm-surface-raised: #ffffff;
+  --fm-fg: #2b1d12;
+  --fm-fg-muted: #7a6554;
+  --fm-border: #ecdcc8;
+  --fm-primary: #c2410c;
+  --fm-primary-fg: #fffdf9;
+  --fm-accent: #ea580c;
+  --fm-accent-fg: #ffffff;
+  --fm-radius-control: 999px;
+  --fm-radius-card: 1.25rem;
+  --fm-radius-sheet: 1.75rem;
+  --fm-font-display: Georgia, "Times New Roman", serif;
+}

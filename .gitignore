@@ -1,0 +1,67 @@
+# ---------------------------------------------------------------------------
+# Secrets and local configuration
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Python (backend)
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Node / Next.js (frontend)
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+.vercel/
+
+# Files that create-next-app / `next dev` may generate for AI coding tools.
+# Generation is disabled in frontend/next.config.ts (agentRules: false); this is a safety net.
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
+# ---------------------------------------------------------------------------
+# Data and backups
+# ---------------------------------------------------------------------------
+backend/backups/
+*.dump
+data/raw/
+
+# ---------------------------------------------------------------------------
+# OS and editors
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------------------
+# BEFORE MAKING THE REPOSITORY PUBLIC
+# Team-internal files. Uncomment the lines below, then untrack the files (ignoring alone does
+# not remove files that are already committed):
+#
+#   git rm -r --cached docs/team .github/CODEOWNERS .github/pull_request_template.md frontend/src/app/dev
+#   git commit -m "chore: remove team-internal files"
+#
+# Full checklist: docs/team/README.md ("Before going public").
+# ---------------------------------------------------------------------------
+# docs/team/
+# .github/CODEOWNERS
+# .github/pull_request_template.md
+# frontend/src/app/dev/

@@ -1,0 +1,29 @@
+/* Neutral placeholder theme, used until the visual design is final. Adjust values freely. */
+:root,
+[data-theme="default"] {
+  --fm-bg: #f7f7f8;
+  --fm-surface: #ffffff;
+  --fm-surface-raised: #ffffff;
+  --fm-fg: #18181b;
+  --fm-fg-muted: #6b7280;
+  --fm-border: #e4e4e7;
+  --fm-primary: #18181b;
+  --fm-primary-fg: #ffffff;
+  --fm-accent: #e11d48;
+  --fm-accent-fg: #ffffff;
+  --fm-success: #16a34a;
+  --fm-warning: #d97706;
+  --fm-danger: #dc2626;
+  --fm-overlay: rgb(0 0 0 / 0.4);
+
+  --fm-radius-control: 0.5rem;
+  --fm-radius-card: 0.75rem;
+  --fm-radius-sheet: 1.25rem;
+
+  --fm-shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
+  --fm-shadow-sheet: 0 -8px 24px rgb(0 0 0 / 0.12);
+
+  --fm-font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --fm-font-display: var(--fm-font-sans);
+  --fm-ease: cubic-bezier(0.2, 0, 0, 1);
+}

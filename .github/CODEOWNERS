@@ -1,0 +1,35 @@
+# Replace @TODO-* with real GitHub usernames, then enable "Require review from Code Owners"
+# in the branch protection rule for main. Later lines override earlier ones.
+*                                   @TODO-member-C
+
+# ---- Member A: M3 (AI Match) + M4 (Reviews)
+/backend/app/modules/match/         @TODO-member-A
+/backend/app/modules/reviews/       @TODO-member-A
+/frontend/src/features/reviews/     @TODO-member-A
+/data/                              @TODO-member-A
+
+# ---- Member B: M2 (Map & saved places) + M6 (Journey) + M7 (Google compliance)
+/backend/app/modules/saved_places/  @TODO-member-B
+/backend/app/modules/journey/       @TODO-member-B
+/backend/app/modules/google_places/ @TODO-member-B
+/frontend/src/features/map/         @TODO-member-B
+/frontend/src/features/journey/     @TODO-member-B
+/frontend/src/features/places/      @TODO-member-B
+
+# ---- Member C: M1 (Auth) + M5 (Group Session) + UI / design system
+/backend/app/modules/auth/          @TODO-member-C
+/backend/app/modules/groups/        @TODO-member-C
+/frontend/src/ui/                   @TODO-member-C
+/frontend/src/features/auth/        @TODO-member-C
+/frontend/src/features/group/       @TODO-member-C
+/frontend/src/features/taste/       @TODO-member-C
+# Match UI: C builds the interface, A owns the content and API, so both review.
+/frontend/src/features/match/       @TODO-member-C @TODO-member-A
+
+# ---- Shared code: changes affect everyone, so everyone reviews
+/backend/app/core/                  @TODO-member-A @TODO-member-B @TODO-member-C
+/backend/app/shared/                @TODO-member-A @TODO-member-B @TODO-member-C
+/backend/migrations/env.py          @TODO-member-A @TODO-member-B @TODO-member-C
+/frontend/src/lib/                  @TODO-member-A @TODO-member-B @TODO-member-C
+/Makefile                           @TODO-member-A @TODO-member-B @TODO-member-C
+/.github/workflows/                 @TODO-member-A @TODO-member-B @TODO-member-C
