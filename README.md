@@ -196,11 +196,11 @@ Popular / Recommended Dishes
                                ▼
                     ┌─────────────────────┐
                     │      Frontend       │
-                    │ React / Next.js     │
+                    │ Next.js (React)     │
                     │ TailwindCSS         │
-                    │ Leaflet / Mapbox    │
+                    │ Google Maps JS API  │
                     └──────────┬──────────┘
-                               │
+                               │  /api/*
                                ▼
                     ┌─────────────────────┐
                     │       FastAPI       │
@@ -224,22 +224,25 @@ Popular / Recommended Dishes
        └─────────────────┘
 ```
 
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · design decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
+
 ---
 
 ## 🛠️ Technology Stack
 
-| Component           | Technology                   |
-| ------------------- | ---------------------------- |
-| **Frontend**        | React / Next.js, TailwindCSS |
-| **Map**             | Leaflet / Mapbox             |
-| **Backend**         | FastAPI, Python              |
-| **Database**        | PostgreSQL                   |
-| **Geospatial Data** | PostGIS                      |
-| **Vector Search**   | pgvector                     |
-| **Text Embeddings** | sentence-transformers        |
-| **AI / NLP**        | Gemini API                   |
-| **Restaurant Data** | Google Places API            |
-| **Social Content**  | TikTok, Facebook, Instagram  |
+| Component           | Technology                                   |
+| ------------------- | -------------------------------------------- |
+| **Frontend**        | Next.js (React, TypeScript), TailwindCSS     |
+| **Map**             | Google Maps JavaScript API                   |
+| **Backend**         | FastAPI, Python, SQLAlchemy, Alembic         |
+| **Database**        | PostgreSQL                                   |
+| **Geospatial Data** | PostGIS                                      |
+| **Vector Search**   | pgvector                                     |
+| **Text Embeddings** | sentence-transformers                        |
+| **AI / NLP**        | Gemini API                                   |
+| **Restaurant Data** | Google Places API                            |
+| **Social Content**  | TikTok, Facebook, Instagram                  |
+| **Tooling**         | uv (Python), npm (Node.js), Docker, make      |
 
 ---
 
@@ -253,7 +256,7 @@ For selected restaurants, additional information such as menu details, TikTok vi
 
 ## 🚧 Project Scope & Status
 
-The first version of FoodMaps will focus on a selected number of restaurants and cafés in central Hanoi. The project is currently in the **planning and system design stage**, with the next steps being data collection, database design, semantic search implementation, and frontend development.
+The first version of FoodMaps will focus on a selected number of restaurants and cafés in central Hanoi. The project is currently **in development**: the repository structure, database, backend and frontend foundations are in place, and the core features (semantic search, review analysis, group decision session) are being implemented.
 
 As the project develops, the system may be expanded to cover more locations, restaurants, and personalized recommendation features.
 
@@ -272,39 +275,116 @@ Possible future improvements include:
 
 ---
 
-## ⚙️ Installation
+## ⚙️ Installation & Running Locally
 
-Installation instructions will be added after the project structure and development environment are finalized.
+All commands run in a **bash** shell: the default terminal on Linux/macOS, and **Git Bash** on
+Windows (installed with Git for Windows).
+
+### 1. Prerequisites
+
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Git | recent | Windows: [Git for Windows](https://git-scm.com/download/win), which includes Git Bash |
+| GNU make | any | Linux/macOS: usually preinstalled. Windows: `winget install ezwinports.make` |
+| [uv](https://docs.astral.sh/uv/) | ≥ 0.8 | Python package manager; downloads the right Python (3.12) automatically |
+| Node.js | 22 LTS or newer | https://nodejs.org |
+| Docker | Docker Desktop / Engine | Runs PostgreSQL + PostGIS + pgvector |
+
+On Windows, everything can be installed from PowerShell with winget:
+
+```powershell
+winget install --id Git.Git
+winget install --id ezwinports.make
+winget install --id astral-sh.uv
+winget install --id OpenJS.NodeJS.LTS
+winget install --id Docker.DockerDesktop
+```
+
+Open a new terminal afterwards so the tools are on your `PATH`.
+
+### 2. Clone and install
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-
-# Install dependencies
-# ...
-
-# Run the backend
-# ...
-
-# Run the frontend
-# ...
+git clone <repository-url> foodmaps
+cd foodmaps
+make setup
 ```
+
+`make setup` installs the backend (`uv sync`) and frontend (`npm ci`) dependencies and creates
+`backend/.env` and `frontend/.env.local` from the example files.
+
+### 3. Configure environment variables
+
+The defaults work for local development; API keys are only needed by the features that use them.
+
+| File | Variable | Purpose |
+| --- | --- | --- |
+| `backend/.env` | `DATABASE_URL` | PostgreSQL connection (defaults to the Docker database) |
+| | `JWT_SECRET` | Secret for signing login tokens: **change it** outside local development |
+| | `GOOGLE_MAPS_API_KEY` | Google Places API (server side) |
+| | `GEMINI_API_KEY` | Gemini API for review analysis |
+| | `USE_STUB_MATCH` | `true` = sample recommendations while the AI pipeline is not configured |
+| `frontend/.env.local` | `BACKEND_URL` | Where the frontend forwards `/api/*` requests (default `http://localhost:8000`) |
+| | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAP_ID` | Google Maps JavaScript API (browser side) |
+
+For semantic search and review analysis, also install the AI dependencies:
+`cd backend && uv sync --extra ai`.
+
+### 4. Start the database and create the tables
+
+Make sure Docker is running, then:
+
+```bash
+make db        # PostgreSQL 16 + PostGIS + pgvector on localhost:5432
+make migrate   # apply database migrations
+```
+
+### 5. Run the app
+
+```bash
+make dev
+```
+
+- Web app: http://localhost:3000
+- Backend API: http://localhost:8000 (interactive docs at http://localhost:8000/docs)
+
+`Ctrl+C` stops both. Run `make` to list every command (`test`, `lint`, `check`, `db-down`, ...).
+
+### Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| `make` / `uv` / `node` not found | Open a new terminal; on Windows use Git Bash, not PowerShell or cmd |
+| `make db` cannot connect to Docker | Start Docker Desktop and wait until the engine is running |
+| Port 5432 already in use | Stop the local PostgreSQL service, or change the port in `docker-compose.yml` and `DATABASE_URL` |
+| Cannot run Docker | Use a hosted PostgreSQL with the `postgis` and `vector` extensions (e.g. Supabase) and set `DATABASE_URL` with the `postgresql+asyncpg://` prefix |
 
 ---
 
 ## 📁 Project Structure
 
-The project structure will be added and updated as development progresses.
-
 ```text
-FoodMaps/
-│
-├── frontend/
-├── backend/
-├── data/
-├── notebooks/
-├── README.md
-└── requirements.txt
+foodmaps/
+├── backend/              FastAPI application (managed with uv)
+│   ├── app/
+│   │   ├── core/         configuration, database session, error handling
+│   │   ├── shared/       contracts shared between feature modules
+│   │   └── modules/      one package per feature: auth, saved_places, match,
+│   │                     reviews, groups, journey, google_places
+│   ├── migrations/       Alembic database migrations
+│   ├── scripts/          OpenAPI export, migration check, database backup
+│   └── tests/
+├── frontend/             Next.js application
+│   └── src/
+│       ├── app/          pages (routes)
+│       ├── features/     feature components, hooks and API calls
+│       ├── ui/           design system: tokens, themes, base components
+│       └── lib/api/      typed API client generated from the backend schema
+├── infra/db/             PostgreSQL + PostGIS + pgvector image
+├── data/                 data collection and seeding scripts
+├── docs/                 architecture and design decisions
+├── docker-compose.yml
+└── Makefile              developer commands (run `make` to list them)
 ```
 
 ---
