@@ -16,7 +16,7 @@ setup: ## Install backend + frontend dependencies and create local env files
 	@test -f frontend/.env.local || cp frontend/.env.example frontend/.env.local
 	@echo "Done. Next: make db && make migrate && make dev"
 
-db: ## Start PostgreSQL 16 + PostGIS + pgvector (Docker) on localhost:5432
+db: ## Start PostgreSQL 16 + PostGIS + pgvector (Docker) on localhost:5433
 	docker compose up -d --build db
 
 db-down: ## Stop the database (data is kept)
@@ -63,5 +63,5 @@ build: ## Production build of the frontend
 	cd frontend && npm run build
 
 backup: ## Dump a database with pg_dump in Docker: make backup url="postgresql://..."
-	@test -n "$(url)" || (echo 'Usage: make backup url="postgresql://user:pass@host:5432/db"' && exit 1)
+	@test -n "$(url)" || (echo 'Usage: make backup url="postgresql://user:pass@host:5433/db"' && exit 1)
 	cd backend && uv run python scripts/backup_db.py "$(url)"

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     env: Literal["dev", "test", "demo", "prod"] = "dev"
 
     # --- Database ---
-    database_url: str = "postgresql+asyncpg://foodmaps:foodmaps@localhost:5432/foodmaps"
+    database_url: str = "postgresql+asyncpg://foodmaps:foodmaps@localhost:5433/foodmaps"
     # PgBouncer in transaction mode (e.g. the Supabase pooler on port 6543) does not support
     # asyncpg's prepared statements. Set to True when DATABASE_URL points at such a pooler.
     db_use_pgbouncer: bool = False

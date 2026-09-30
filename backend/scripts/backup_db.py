@@ -1,6 +1,6 @@
 """Back up a database with pg_dump running inside Docker (no local PostgreSQL install needed).
 
-    make backup url="postgresql://user:pass@host:5432/postgres"
+    make backup url="postgresql://user:pass@host:5433/postgres"
 
 - Use a plain postgresql:// URL (the +asyncpg suffix is stripped automatically).
 - Dumps go to backend/backups/ (git-ignored).
