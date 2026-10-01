@@ -16,19 +16,19 @@ make migrate             # apply migrations your teammates merged
 
 ## 2. The standard loop
 
-| # | Step | Command / action |
-|---|---|---|
-| 1 | Pick one small task (one module, one behaviour) | Say in the group chat what you are starting, especially if it touches shared code |
-| 2 | Branch from an up-to-date `main` | `git switch -c m5/vote-endpoint` (format: `<module>/<short-description>`; `ui/...`, `chore/...`, `docs/...` for non-module work) |
-| 3 | Code in your module's folders | See §3 for the extra steps of your change type |
-| 4 | Test locally | `make test`, plus clicking through the feature with `make dev` |
-| 5 | Commit in small steps | `git commit -m "feat(m5): add vote endpoint"` (see §4) |
-| 6 | Catch up with `main` | `git fetch origin && git rebase origin/main`, resolve conflicts (CONTRIBUTING §3), then `make migrate` if new migrations arrived |
-| 7 | Run every check | `make check` must end with "All checks passed." |
-| 8 | Push and open a pull request | `git push -u origin HEAD`; fill in the template; open it as a **draft** early if you want feedback |
-| 9 | Wait for CI + one review | Answer comments with new commits (no force-push after review starts, so reviewers can see what changed) |
-| 10 | Merge | **Squash and merge**; the branch is deleted automatically |
-| 11 | Clean up locally | `git switch main && git pull && git branch -d m5/vote-endpoint` |
+| #  | Step                                            | Command / action                                                                                                                           |
+| -- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1  | Pick one small task (one module, one behaviour) | Say in the group chat what you are starting, especially if it touches shared code                                                          |
+| 2  | Branch from an up-to-date`main`               | `git switch -c m5/vote-endpoint` (format: `<module>/<short-description>`; `ui/...`, `chore/...`, `docs/...` for non-module work) |
+| 3  | Code in your module's folders                   | See §3 for the extra steps of your change type                                                                                            |
+| 4  | Test locally                                    | `make test`, plus clicking through the feature with `make dev`                                                                         |
+| 5  | Commit in small steps                           | `git commit -m "feat(m5): add vote endpoint"` (see §4)                                                                                  |
+| 6  | Catch up with`main`                           | `git fetch origin && git rebase origin/main`, resolve conflicts (CONTRIBUTING §3), then `make migrate` if new migrations arrived      |
+| 7  | Run every check                                 | `make check` must end with "All checks passed."                                                                                          |
+| 8  | Push and open a pull request                    | `git push -u origin HEAD`; fill in the template; open it as a **draft** early if you want feedback                                 |
+| 9  | Wait for CI + one review                        | Answer comments with new commits (no force-push after review starts, so reviewers can see what changed)                                    |
+| 10 | Merge                                           | **Squash and merge**; the branch is deleted automatically                                                                            |
+| 11 | Clean up locally                                | `git switch main && git pull && git branch -d m5/vote-endpoint`                                                                          |
 
 Keep branches alive for 1–3 days. Something bigger? Split it into several PRs that each keep
 `main` working (e.g. model + migration first, endpoint second, UI third).
