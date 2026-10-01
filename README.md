@@ -278,13 +278,13 @@ Windows (installed with Git for Windows).
 
 ### 1. Prerequisites
 
-| Tool                            | Version                 | Notes                                                                                 |
-| ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
-| Git                             | recent                  | Windows: [Git for Windows](https://git-scm.com/download/win), which includes Git Bash |
-| GNU make                        | any                     | Linux/macOS: usually preinstalled. Windows:`winget install ezwinports.make`         |
-| [uv](https://docs.astral.sh/uv/) | ≥ 0.8                  | Python package manager; downloads the right Python (3.12) automatically               |
-| Node.js                         | 22 LTS or newer         | https://nodejs.org                                                                    |
-| Docker                          | Docker Desktop / Engine | Runs PostgreSQL + PostGIS + pgvector                                                  |
+| Tool                            | Version                 | Notes                                                                               |
+| ------------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| Git                             | recent                  | Windows:[Git for Windows](https://git-scm.com/download/win), which includes Git Bash |
+| GNU make                        | any                     | Linux/macOS: usually preinstalled. Windows:`winget install ezwinports.make`       |
+| [uv](https://docs.astral.sh/uv/) | ≥ 0.8                  | Python package manager; downloads the right Python (3.12) automatically             |
+| Node.js                         | 22 LTS or newer         | https://nodejs.org                                                                  |
+| Docker                          | Docker Desktop / Engine | Runs PostgreSQL + PostGIS + pgvector                                                |
 
 On Windows, everything can be installed from PowerShell with winget:
 
@@ -364,7 +364,7 @@ foodmaps/
 ├── backend/              FastAPI application (managed with uv)
 │   ├── app/
 │   │   ├── core/         configuration, database session, error handling
-│   │   ├── shared/       contracts shared between feature modules
+│   │   ├── shared/       contracts shared between feature umodules
 │   │   └── modules/      one package per feature: auth, saved_places, match,
 │   │                     reviews, groups, journey, google_places
 │   ├── migrations/       Alembic database migrations
