@@ -53,9 +53,11 @@ def run_offline():
 
 
 def _run_sync(connection):
-    _load_extension_tables(connection)
     _configure(connection=connection)
     with context.begin_transaction():
+        # Query inside Alembic's own transaction: a query before it would autobegin one that
+        # Alembic does not own, and the migrations would be rolled back when the connection closes.
+        _load_extension_tables(connection)
         context.run_migrations()
 
 
