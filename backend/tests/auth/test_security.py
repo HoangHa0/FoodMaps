@@ -2,11 +2,7 @@
 
 import uuid
 
-import pytest
-
 from app.modules.auth import security
-
-pytestmark = pytest.mark.todo
 
 
 def test_hash_is_not_plaintext_and_verifies():
