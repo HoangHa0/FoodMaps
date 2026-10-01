@@ -11,4 +11,6 @@ export function useMe() {
   return useQuery({ queryKey: ME_QUERY_KEY, queryFn: authApi.me, staleTime: 5 * 60_000 });
 }
 
-// TODO(M1): useLogin / useRegister / useLogout (useMutation + queryClient.setQueryData(ME_QUERY_KEY, ...))
+// M1: useLogin / useRegister / useLogout (useMutation + queryClient.setQueryData(ME_QUERY_KEY, ...))
+/** The logged-in user, or null for a guest. */
+export type Me = Awaited<ReturnType<typeof authApi.me>>;
