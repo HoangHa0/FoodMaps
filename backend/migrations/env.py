@@ -1,6 +1,7 @@
 import asyncio
 
 from alembic import context
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
@@ -11,11 +12,28 @@ import_all_models()  # load models.py of every module so autogenerate sees all t
 target_metadata = Base.metadata
 
 # Tables created by extensions (PostGIS): keep autogenerate from trying to drop them.
-IGNORED_TABLES = {"spatial_ref_sys"}
+# Tables owned by database extensions (PostGIS, topology, Tiger geocoder...) are not ours:
+# keep autogenerate and `alembic check` from trying to drop them. The list is read from the
+# database (pg_depend, deptype 'e' = "member of an extension"), so nothing is hard-coded.
+EXTENSION_TABLES: set[str] = set()
+
+
+def _load_extension_tables(connection) -> None:
+    rows = connection.execute(
+        text(
+            "SELECT c.relname FROM pg_depend d JOIN pg_class c ON c.oid = d.objid "
+            "WHERE d.classid = 'pg_class'::regclass AND d.deptype = 'e' AND c.relkind IN ('r', 'p')"
+        )
+    )
+    EXTENSION_TABLES.update(row[0] for row in rows)
 
 
 def include_object(obj, name, type_, reflected, compare_to):
-    return not (type_ == "table" and name in IGNORED_TABLES)
+    # Only skip tables that exist in the database but not in our models; a model table that
+    # happens to share a name with an extension table must still be created by migrations.
+    if type_ == "table" and reflected and compare_to is None:
+        return name not in EXTENSION_TABLES
+    return True
 
 
 def _configure(connection=None, url=None):
@@ -35,6 +53,7 @@ def run_offline():
 
 
 def _run_sync(connection):
+    _load_extension_tables(connection)
     _configure(connection=connection)
     with context.begin_transaction():
         context.run_migrations()
