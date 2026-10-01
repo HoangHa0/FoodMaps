@@ -31,7 +31,7 @@ jobs:
         working-directory: .
         run: |
           id=$(docker ps -q --filter "ancestor=postgis/postgis:16-3.5")
-          docker exec "$id" bash -c "apt-get update -q && apt-get install -y -q postgresql-16-pgvector"
+          docker exec "$id" bash -c "apt-get update -q || { sed -i 's|apt.postgresql.org|apt-archive.postgresql.org|g' /etc/apt/sources.list.d/pgdg.* && apt-get update -q; } && apt-get install -y -q postgresql-16-pgvector"
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - name: Lint
