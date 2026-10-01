@@ -10,6 +10,9 @@ from typing import Annotated
 from fastapi import Depends, Request
 from pydantic import BaseModel
 
+from app.core.config import get_settings
+from app.modules.auth.security import decode_access_token
+
 
 class AuthUser(BaseModel):
     """All that other modules ever see of a user: no password hash, no ORM object."""
@@ -19,7 +22,13 @@ class AuthUser(BaseModel):
 
 
 def _extract_token(request: Request) -> str | None:
-    return None  # TODO(M1): cookie first, then the Authorization header
+    token = request.cookies.get(get_settings().auth_cookie_name)
+    if token:
+        return token
+    scheme, _, value = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and value.strip():
+        return value.strip()
+    return None
 
 
 async def get_optional_user(request: Request) -> AuthUser | None:
@@ -29,7 +38,14 @@ async def get_optional_user(request: Request) -> AuthUser | None:
     the map and search. Only decodes the JWT (no database query), which keeps it cheap enough
     to use on every endpoint.
     """
-    return None  # TODO(M1)
+    token = _extract_token(request)
+    if token is None:
+        return None
+    decoded = decode_access_token(token)
+    if decoded is None:
+        return None
+    user_id, username = decoded
+    return AuthUser(id=user_id, username=username)
 
 
 async def get_current_user(
