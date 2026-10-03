@@ -1,16 +1,34 @@
 "use client";
 
-import { Button, Card, Input } from "@/ui";
+import { useRouter } from "next/navigation";
 
-/** Container. TODO(M5): create room -> saveParticipant -> router.push(`/group/${code}`). */
+import { useMe } from "@/features/auth";
+
+import { useCreateRoom } from "../hooks/useRoomActions";
+import { NameForm, Screen } from "./views";
+
+/** Container: create room -> token saved (in the hook) -> go to the room page. */
 export function CreateRoomScreen() {
+  const router = useRouter();
+  const create = useCreateRoom();
+  const { data: me } = useMe(); // logged in -> suggest the username (the backend also links user_id)
+
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 p-6">
-      <Card className="flex flex-col gap-4">
-        <h1 className="font-display text-xl font-semibold">Quyết định cùng nhóm</h1>
-        <Input label="Tên của bạn" name="display_name" maxLength={30} />
-        <Button fullWidth>Tạo phòng</Button>
-      </Card>
-    </main>
+    <Screen>
+      <div className="flex flex-1 flex-col justify-center">
+        <NameForm
+          // remount once the user is known, so the suggested name appears
+          key={me?.username ?? "guest"}
+          title="Quyết định cùng nhóm"
+          submitLabel="Tạo phòng"
+          defaultName={me?.username ?? ""}
+          loading={create.isPending || create.isSuccess}
+          error={create.error?.message}
+          onSubmit={(name) =>
+            create.mutate(name, { onSuccess: (j) => router.push(`/group/${j.code}`) })
+          }
+        />
+      </div>
+    </Screen>
   );
 }
