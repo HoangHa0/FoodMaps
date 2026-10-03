@@ -747,6 +747,12 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -802,6 +808,9 @@
           "403": {
             "description": "Forbidden"
           },
+          "409": {
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -845,7 +854,7 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
@@ -993,6 +1002,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
           },
           "409": {
             "description": "Conflict"

@@ -2,22 +2,25 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.shared.contracts import MatchCriteria
 
 RoomStatus = Literal["lobby", "voting", "decided", "expired"]
-DisplayName = Field(min_length=1, max_length=30, examples=["Hà"])
+# Whitespace is stripped BEFORE the length check, so "   " is rejected (422) instead of becoming a blank name
+DisplayName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30), Field(examples=["Hà"])
+]
 
 
 class CreateRoomIn(BaseModel):
-    display_name: str = DisplayName  # the host's display name
+    display_name: DisplayName  # the host's display name
 
 
 class JoinRoomIn(BaseModel):
-    display_name: str = DisplayName
+    display_name: DisplayName
 
 
 class JoinedOut(BaseModel):

@@ -24,7 +24,20 @@ def majority_threshold(member_count: int) -> int:
 
     1 -> 1, 2 -> 2, 3 -> 2, 4 -> 3, 5 -> 3.
     """
-    raise NotImplementedError  # TODO(M5)
+    return member_count // 2 + 1
+
+
+def most_liked(tallies: list[Tally]) -> Tally | None:
+    """The place with the most likes (ties -> lower rank), or None if nothing has a like.
+
+    Also used outside decide(): when the host finalizes early and when an expired room still
+    has likes.
+    """
+    liked = [t for t in tallies if t.likes > 0]
+    if not liked:
+        return None
+    # min() over (-likes, rank): most likes first, then the better match score
+    return min(liked, key=lambda t: (-t.likes, t.rank))
 
 
 def decide(tallies: list[Tally], member_count: int, all_voted: bool) -> Decision | None:
@@ -37,4 +50,11 @@ def decide(tallies: list[Tally], member_count: int, all_voted: bool) -> Decision
        None (the host sees "no match" and can start over with different criteria).
     3. Otherwise: None (voting continues).
     """
-    raise NotImplementedError  # TODO(M5)
+    best = most_liked(tallies)
+    if best is None:
+        return None  # nobody liked anything yet (or ever, if all_voted)
+    if best.likes >= majority_threshold(member_count):
+        return Decision(best.candidate_key, "majority")
+    if all_voted:
+        return Decision(best.candidate_key, "all_voted")
+    return None

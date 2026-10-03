@@ -1,10 +1,6 @@
 """Specification for M5 tokens.py. Remove `pytestmark` once implemented."""
 
-import pytest
-
 from app.modules.groups import tokens
-
-pytestmark = pytest.mark.todo
 
 
 def test_room_code_format():
