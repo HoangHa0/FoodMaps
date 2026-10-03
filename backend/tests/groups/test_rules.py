@@ -2,9 +2,7 @@
 
 import pytest
 
-from app.modules.groups.rules import Decision, Tally, decide, majority_threshold
-
-pytestmark = pytest.mark.todo
+from app.modules.groups.rules import Decision, Tally, decide, majority_threshold, most_liked
 
 
 @pytest.mark.parametrize("n,need", [(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (12, 7)])
@@ -38,3 +36,17 @@ def test_all_voted_nobody_liked_anything():
 
 def test_solo_room():
     assert decide([T("a", 0, 1)], 1, False) == Decision("a", "majority")
+
+
+def test_majority_needs_strictly_more_than_half():
+    # 2 of 4 is exactly 50%: not enough, keep waiting
+    assert decide([T("a", 0, 2), T("b", 1, 0)], 4, False) is None
+
+
+def test_all_voted_tie_broken_by_rank():
+    assert decide([T("a", 2, 1), T("b", 1, 1), T("c", 0, 0)], 4, True) == Decision("b", "all_voted")
+
+
+def test_most_liked_ignores_places_without_likes():
+    assert most_liked([T("a", 0, 0), T("b", 1, 0)]) is None
+    assert most_liked([T("a", 0, 0), T("b", 1, 1)]) == T("b", 1, 1)
