@@ -35,7 +35,8 @@
   --fm-shadow-float: 0 6px 22px rgb(60 48 20 / 0.16);
 
   --fm-font-sans: "Nunito Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --fm-font-display: "Kalam", "Mali", cursive; /* Mali covers Vietnamese letters Kalam lacks */
+  --fm-font-display: "Mali", "Kalam", cursive;
+  --fm-font-brand: "Kalam", "Mali", cursive;
   --fm-font-hand: "Caveat", "Mali", cursive;
   --fm-ease: cubic-bezier(0.2, 0, 0, 1);
 }
