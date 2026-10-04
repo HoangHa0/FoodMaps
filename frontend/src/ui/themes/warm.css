@@ -14,4 +14,9 @@
   --fm-radius-card: 1.25rem;
   --fm-radius-sheet: 1.75rem;
   --fm-font-display: Georgia, "Times New Roman", serif;
+  --fm-sunken: #f6ead9;
+  --fm-band: #f3e2cc;
+  --fm-primary-soft: #fde7d6;
+  --fm-pin-neutral: #7a6554;
+  --fm-pin-hot: #c2410c;
 }

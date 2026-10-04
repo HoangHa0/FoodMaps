@@ -2,6 +2,7 @@
 @import "../ui/tokens.css";
 @import "../ui/themes/default.css";
 @import "../ui/themes/warm.css";
+@import "../ui/themes/sunny.css";
 
 body {
   background: var(--color-bg);
