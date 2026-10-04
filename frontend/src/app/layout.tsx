@@ -12,6 +12,7 @@ import "@fontsource/caveat/500.css";
 import "@fontsource/mali/600.css";
 import "@fontsource/mali/700.css";
 
+import { AppShell } from "@/features/shell";
 import { ACTIVE_THEME } from "@/ui";
 
 import "./globals.css";
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="vi" data-theme={ACTIVE_THEME} className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );
