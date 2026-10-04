@@ -36,4 +36,5 @@
   --fm-pin-hot: #dc2626;
   --fm-shadow-float: 0 4px 16px rgb(0 0 0 / 0.12);
   --fm-font-hand: var(--fm-font-sans);
+  --fm-font-brand: var(--fm-font-display);
 }

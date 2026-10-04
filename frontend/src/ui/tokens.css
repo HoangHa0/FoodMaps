@@ -45,6 +45,7 @@
   --font-sans: var(--fm-font-sans);
   --font-display: var(--fm-font-display);
   --font-hand: var(--fm-font-hand); /* handwritten notes and map labels */
+  --font-brand: var(--fm-font-brand);
   
   --ease-standard: var(--fm-ease);
 }

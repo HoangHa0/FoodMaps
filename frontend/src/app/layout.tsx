@@ -10,6 +10,7 @@ import "@fontsource/nunito-sans/800.css";
 import "@fontsource/kalam/700.css";
 import "@fontsource/caveat/500.css";
 import "@fontsource/mali/600.css";
+import "@fontsource/mali/700.css";
 
 import { ACTIVE_THEME } from "@/ui";
 
