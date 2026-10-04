@@ -1,22 +1,31 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "../cn";
 
 export interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   selected?: boolean;
+  /** Optional leading icon (e.g. <IconTrending className="size-4" />). */
+  icon?: ReactNode;
 }
 
-export function Chip({ selected, className, ...rest }: ChipProps) {
+/** Filter / choice pill. Selected = dark ink pill; otherwise a light floating pill. */
+export function Chip({ selected, icon, className, children, ...rest }: ChipProps) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       {...rest}
       className={cn(
-        "h-8 rounded-control border px-3 text-sm transition ease-standard",
-        selected ? "bg-primary text-primary-fg border-primary" : "bg-surface border-border",
+        "inline-flex h-9 items-center gap-2 rounded-control px-3.5 text-[0.84rem] font-semibold transition ease-standard",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg",
+        selected
+          ? "bg-fg text-surface shadow-card [&_svg]:text-primary"
+          : "bg-surface text-fg shadow-card hover:bg-primary-soft",
         className,
       )}
-    />
+    >
+      {icon}
+      {children}
+    </button>
   );
 }

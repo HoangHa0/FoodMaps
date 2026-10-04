@@ -15,7 +15,7 @@ export function Input({ label, error, hint, className, id, ...rest }: InputProps
   return (
     <div className="flex flex-col gap-1">
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium">
+        <label htmlFor={inputId} className="text-sm font-semibold">
           {label}
         </label>
       )}
@@ -25,14 +25,14 @@ export function Input({ label, error, hint, className, id, ...rest }: InputProps
         aria-invalid={!!error || undefined}
         aria-describedby={error || hint ? msgId : undefined}
         className={cn(
-          "h-10 rounded-control border bg-surface px-3 outline-none",
+          "h-11 rounded-control border bg-surface-raised px-4 outline-none transition ease-standard",
           "focus:ring-2 focus:ring-primary",
           error ? "border-danger" : "border-border",
           className,
         )}
       />
       {(error || hint) && (
-        <p id={msgId} className={cn("text-sm", error ? "text-danger" : "text-fg-muted")}>
+        <p id={msgId} className={cn("px-4 text-sm", error ? "text-danger" : "text-fg-muted")}>
           {error ?? hint}
         </p>
       )}

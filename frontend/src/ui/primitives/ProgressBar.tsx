@@ -20,9 +20,9 @@ export function ProgressBar({
       aria-valuemax={max}
       aria-valuenow={value}
       aria-label={label}
-      className="relative h-2 w-full overflow-hidden rounded-control bg-bg border border-border"
+      className="relative h-2.5 w-full overflow-hidden rounded-control bg-primary-soft"
     >
-      <div className={cn("h-full bg-accent transition-all ease-standard")} style={{ width: `${pct}%` }} />
+      <div className={cn("h-full rounded-control bg-primary transition-all ease-standard")} style={{ width: `${pct}%` }} />
       {marker !== undefined && max > 0 && (
         <div className="absolute inset-y-0 w-0.5 bg-fg" style={{ left: `${(marker / max) * 100}%` }} />
       )}

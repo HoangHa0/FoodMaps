@@ -26,4 +26,14 @@
   --fm-font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
   --fm-font-display: var(--fm-font-sans);
   --fm-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* added with the "sunny" redesign: every theme must define these */
+  --fm-sunken: #f1f1f3;
+  --fm-band: #ececef;
+  --fm-primary-soft: #f4f4f5;
+  --fm-rating: #f59e0b;
+  --fm-pin-neutral: #52525b;
+  --fm-pin-hot: #dc2626;
+  --fm-shadow-float: 0 4px 16px rgb(0 0 0 / 0.12);
+  --fm-font-hand: var(--fm-font-sans);
 }

@@ -5,6 +5,7 @@
  *
  *   bg-surface  text-fg-muted  border-border  bg-primary  text-primary-fg
  *   rounded-card  rounded-control  shadow-sheet  font-display  bg-accent (matched place)
+ *   bg-sunken  bg-band  bg-primary-soft  text-rating  font-hand  shadow-float
  */
 @theme inline {
   /* Remove Tailwind's default palette (red-500, gray-700, ...) so only token colours exist:
@@ -26,15 +27,24 @@
   --color-danger: var(--fm-danger);
   --color-overlay: var(--fm-overlay);
 
+  --color-sunken: var(--fm-sunken);             /* sidebar / side surfaces */
+  --color-band: var(--fm-band);                 /* decorative bands (footer wave) */
+  --color-primary-soft: var(--fm-primary-soft); /* tags, active nav item tint */
+  --color-rating: var(--fm-rating);             /* star icons */
+  --color-pin-neutral: var(--fm-pin-neutral);   /* map pins */
+  --color-pin-hot: var(--fm-pin-hot);
+
   --radius-control: var(--fm-radius-control);
   --radius-card: var(--fm-radius-card);
   --radius-sheet: var(--fm-radius-sheet);
 
   --shadow-card: var(--fm-shadow-card);
   --shadow-sheet: var(--fm-shadow-sheet);
+  --shadow-float: var(--fm-shadow-float); /* elements floating over the map */
 
   --font-sans: var(--fm-font-sans);
   --font-display: var(--fm-font-display);
-
+  --font-hand: var(--fm-font-hand); /* handwritten notes and map labels */
+  
   --ease-standard: var(--fm-ease);
 }

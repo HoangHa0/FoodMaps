@@ -1,0 +1,41 @@
+/**
+ * The app's icon set. Features import icons from "@/ui" (never from "lucide-react" directly),
+ * so switching to another icon library later means editing this one file.
+ * Names describe the MEANING in our app, not the drawing.
+ */
+export {
+  AlarmClock as IconOpeningHours,
+  ArrowLeft as IconBack,
+  ArrowRight as IconArrowRight,
+  BriefcaseMedical as IconTrips,
+  Check as IconCheck,
+  ChevronDown as IconChevronDown,
+  ChevronRight as IconChevronRight,
+  Clock as IconClock,
+  Coffee as IconCafe,
+  Cookie as IconCuisines,
+  Crown as IconHost,
+  Flame as IconTrending,
+  Heart as IconHeart,
+  House as IconHome,
+  List as IconList,
+  LocateFixed as IconLocate,
+  LogIn as IconLogin,
+  LogOut as IconLogout,
+  MapPin as IconPin,
+  Minus as IconMinus,
+  Navigation as IconDirections,
+  Plus as IconPlus,
+  Search as IconSearch,
+  Settings as IconSettings,
+  Share2 as IconShare,
+  Star as IconStar,
+  Sun as IconSun,
+  Timer as IconTimer,
+  UserPlus as IconRegister,
+  Users as IconGroup,
+  Utensils as IconRestaurant,
+  Wallet as IconPayment,
+  X as IconClose,
+} from "lucide-react";
+export type { LucideIcon as IconComponent } from "lucide-react";
