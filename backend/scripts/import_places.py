@@ -1,8 +1,8 @@
 """Import sheet places.csv
 
-    cd backend
-    uv run python scripts/import_places.py ../data/raw/places.csv --dry-run
-    uv run python scripts/import_places.py ../data/raw/places.csv
+cd backend
+uv run python scripts/import_places.py ../data/raw/places.csv --dry-run
+uv run python scripts/import_places.py ../data/raw/places.csv
 """
 
 import argparse
@@ -38,10 +38,7 @@ COLUMNS = [
 
 def parse_urls(raw: str) -> list[str]:
     """Ô có thể chứa nhiều link, ngăn bởi xuống dòng / dấu cách / , / ;"""
-    return [
-        u for u in re.split(r"[\s,;]+", raw.strip())
-        if u.startswith("http")
-    ]
+    return [u for u in re.split(r"[\s,;]+", raw.strip()) if u.startswith("http")]
 
 
 def parse_row(row: dict[str, str]) -> dict:
@@ -58,9 +55,7 @@ def parse_row(row: dict[str, str]) -> dict:
         lat = float(r["lat"].replace(",", "."))
         lng = float(r["lng"].replace(",", "."))
     except ValueError:
-        raise ValueError(
-            f"lat/lng không phải số: {r['lat']!r}, {r['lng']!r}"
-        ) from None
+        raise ValueError(f"lat/lng không phải số: {r['lat']!r}, {r['lng']!r}") from None
 
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         raise ValueError(f"lat/lng ngoài phạm vi: {lat}, {lng}")
@@ -87,16 +82,10 @@ def load_csv(path: Path) -> tuple[list[dict], list[str]]:
     ) as f:  # utf-8-sig: bỏ BOM của Google Sheets
         reader = csv.DictReader(f)
 
-        absent = [
-            c for c in COLUMNS
-            if c not in (reader.fieldnames or [])
-        ]
+        absent = [c for c in COLUMNS if c not in (reader.fieldnames or [])]
 
         if absent:
-            raise SystemExit(
-                f"CSV thiếu cột: {absent}. "
-                f"Các cột hiện có: {reader.fieldnames}"
-            )
+            raise SystemExit(f"CSV thiếu cột: {absent}. Các cột hiện có: {reader.fieldnames}")
 
         for line, raw in enumerate(reader, start=2):
             if not any((v or "").strip() for v in raw.values()):
@@ -108,14 +97,8 @@ def load_csv(path: Path) -> tuple[list[dict], list[str]]:
                 errors.append(f"dòng {line}: {e}")
                 continue
 
-            if (
-                row["place_id"] in seen_ids
-                or row["place_code"] in seen_codes
-            ):
-                errors.append(
-                    f"dòng {line}: trùng place_id hoặc "
-                    f"place_code ({row['place_code']})"
-                )
+            if row["place_id"] in seen_ids or row["place_code"] in seen_codes:
+                errors.append(f"dòng {line}: trùng place_id hoặc place_code ({row['place_code']})")
                 continue
 
             seen_ids.add(row["place_id"])
@@ -135,11 +118,7 @@ async def upsert(rows: list[dict]) -> None:
     async with SessionLocal() as session:
         stmt = insert(Place).values(rows)
 
-        update_cols = {
-            c: stmt.excluded[c]
-            for c in COLUMNS
-            if c != "place_id"
-        }
+        update_cols = {c: stmt.excluded[c] for c in COLUMNS if c != "place_id"}
 
         stmt = stmt.on_conflict_do_update(
             index_elements=[Place.place_id],
@@ -173,18 +152,12 @@ def main() -> None:
     for e in errors:
         print("  ✗", e)
 
-    no_tiktok = sum(
-        1 for r in rows
-        if not r["tiktok_urls"]
-    )
+    no_tiktok = sum(1 for r in rows if not r["tiktok_urls"])
 
     print(f"Chưa có tiktok_urls: {no_tiktok}")
 
     if errors:
-        raise SystemExit(
-            "Sửa lỗi trong sheet rồi export lại "
-            "(không ghi gì vào DB)."
-        )
+        raise SystemExit("Sửa lỗi trong sheet rồi export lại (không ghi gì vào DB).")
 
     if args.dry_run:
         print("Dry-run: không ghi DB.")

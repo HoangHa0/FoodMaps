@@ -10,7 +10,6 @@ from app.core.db import Base
 
 
 class Place(Base):
-
     __tablename__ = "places"
 
     place_id: Mapped[str] = mapped_column(String(255), primary_key=True)  # Google place_id
@@ -22,9 +21,7 @@ class Place(Base):
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)
     price_per_person: Mapped[int | None] = mapped_column(Integer)  # VND
-    tiktok_urls: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default="{}"
-    )
+    tiktok_urls: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
