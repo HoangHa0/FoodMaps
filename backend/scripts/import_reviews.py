@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # để import được `app`
 
 # ----------------------------------------------------------------------------------------------
-# CONFIGURATION: Google Form column headers. Case-insensitive; ignores extra spaces/line breaks.
+# CONFIGURATION: Google Form sheet column names.
 # ----------------------------------------------------------------------------------------------
 TIMESTAMP_HEADERS = ["Timestamp", "Dấu thời gian"]
 
@@ -30,8 +30,6 @@ TEXT_COLUMNS = {
     "Đánh giá độ đông giờ cao điểm": "crowd_level",
     "Nhận xét thêm về địa điểm (1 câu thôi cũng được)": "comment",
 }
-
-# Checkbox:
 TAG_COLUMNS = {
     "Bạn thấy địa điểm này thuộc loại hình nào? (Tối đa 2 mục)": "categories",
     "Bạn thấy địa điểm này phù hợp với việc gì?": "suitable_for",
@@ -42,10 +40,11 @@ TAG_COLUMNS = {
     "Món ở địa điểm này thuộc kiểu nào? (Tối đa 8 mục)": "food_types",
 }
 
+IGNORED_TAGS = {"cons": {"không có"}}
+
 LIST_COLUMNS = {
     "Món bạn nghĩ nên thử khi tới quán (cách nhau bằng dấu phẩy)": "recommended_dishes",
 }
-
 SCORE_COLUMNS = {
     "Điểm món ăn/đồ uống": "score_food",
     "Điểm không gian": "score_space",
@@ -54,7 +53,8 @@ SCORE_COLUMNS = {
 }
 PRICE_HEADER = "Bạn chi khoảng bao nhiêu cho 1 người?"
 
-SCORE_MIN, SCORE_MAX = 1, 5
+SCORE_MIN, SCORE_MAX = 1, 5  
+
 
 DATE_FORMATS = ["%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M"]
 TZ = timezone(timedelta(hours=7))  # giờ Việt Nam
@@ -77,7 +77,7 @@ UPSERT_FIELDS = [
     "crowd_level",
     "price_per_person",
     "comment",
-]  # Intentionally excludes status/user_id/source: re-importing won't overwrite flagged/hidden reviews.
+]  
 
 
 def nfc(s: str) -> str:
@@ -100,7 +100,7 @@ def split_tags(raw: str, smart: bool = True) -> list[str]:
         part = part.strip()
         if not part:
             continue
-        if smart and out and part[0].islower():
+        if smart and out and part[0].islower():  
             out[-1] = f"{out[-1]}, {part}"
         elif part not in out:
             out.append(part)
@@ -129,7 +129,7 @@ def parse_timestamp(raw: str, formats: list[str]) -> datetime:
             return datetime.strptime(raw, fmt).replace(tzinfo=TZ)
         except ValueError:
             continue
-    try:
+    try:  # dự phòng: dạng ISO
         dt = datetime.fromisoformat(raw)
         return dt if dt.tzinfo else dt.replace(tzinfo=TZ)
     except ValueError:
@@ -163,7 +163,7 @@ def parse_price(raw: str) -> int | None:
             v = float(num.replace(",", ".")) * _MULT[suffix]
         else:
             v = float(re.sub(r"[.,]", "", num))
-            if v < 1000:  # '55' or '50-70k': values are in thousand VND
+            if v < 1000:
                 v *= last_mult or 1000
         values.append(v)
     return int(sum(values) / len(values))
@@ -213,7 +213,7 @@ def parse_row(cells: list[str], cols: dict, formats: list[str]) -> tuple[dict, l
     created_at = parse_timestamp(cell(cols["ts"]), formats)
 
     row: dict = {
-        "place_code": place_code,  # tạm; đổi thành place_id sau khi tra DB
+        "place_code": place_code,  
         "import_key": f"{created_at.isoformat()}|{place_code}",
         "created_at": created_at,
         "source": "sheet",
@@ -222,7 +222,8 @@ def parse_row(cells: list[str], cols: dict, formats: list[str]) -> tuple[dict, l
     for i, field in cols["score"].items():
         row[field] = parse_score(cell(i), field)
     for i, field in cols["tags"].items():
-        row[field] = split_tags(cell(i))
+        ignored = IGNORED_TAGS.get(field, set())
+        row[field] = [t for t in split_tags(cell(i)) if norm(t) not in ignored]
     for i, field in cols["list"].items():
         row[field] = split_tags(cell(i), smart=False)
     for i, field in cols["text"].items():
@@ -239,9 +240,9 @@ def parse_row(cells: list[str], cols: dict, formats: list[str]) -> tuple[dict, l
 
 def load_csv(path: Path, formats: list[str]) -> tuple[list[dict], list[str], list[str]]:
     rows, errors, warnings = [], [], []
-    seen: dict[str, list[tuple]] = {}
+    seen: dict[str, list[tuple]] = {} 
 
-    with path.open(encoding="utf-8-sig", newline="") as f:
+    with path.open(encoding="utf-8-sig", newline="") as f:  
         reader = csv.reader(f)
         header = next(reader, None)
         if header is None:
@@ -250,7 +251,7 @@ def load_csv(path: Path, formats: list[str]) -> tuple[list[dict], list[str], lis
 
         for line, cells in enumerate(reader, start=2):
             if not any(c.strip() for c in cells):
-                continue
+                continue  
             try:
                 row, warns = parse_row(cells, cols, formats)
             except ValueError as e:
@@ -258,9 +259,6 @@ def load_csv(path: Path, formats: list[str]) -> tuple[list[dict], list[str], lis
                 continue
             warnings += [f"dòng {line}: {w}" for w in warns]
 
-            # Timestamp is only accurate to the minute, so keys may collide:
-            # - identical content = duplicate form submission -> skip
-            # - different content = two real reviews -> add suffixes #2, #3...
             base, sig = row["import_key"], tuple(c.strip() for c in cells)
             if base in seen:
                 if sig in seen[base]:
@@ -297,7 +295,7 @@ async def upsert(rows: list[dict]) -> None:
     from app.modules.reviews.models import Review
 
     async with SessionLocal() as session:
-        for start in range(0, len(rows), 500):
+        for start in range(0, len(rows), 500):  
             stmt = insert(Review).values(rows[start : start + 500])
             stmt = stmt.on_conflict_do_update(
                 index_elements=[Review.import_key],
