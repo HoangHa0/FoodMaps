@@ -53,7 +53,7 @@ SCORE_COLUMNS = {
 }
 PRICE_HEADER = "Bạn chi khoảng bao nhiêu cho 1 người?"
 
-SCORE_MIN, SCORE_MAX = 1, 5  
+SCORE_MIN, SCORE_MAX = 1, 5
 
 
 DATE_FORMATS = ["%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M"]
@@ -77,7 +77,7 @@ UPSERT_FIELDS = [
     "crowd_level",
     "price_per_person",
     "comment",
-]  
+]
 
 
 def nfc(s: str) -> str:
@@ -100,7 +100,7 @@ def split_tags(raw: str, smart: bool = True) -> list[str]:
         part = part.strip()
         if not part:
             continue
-        if smart and out and part[0].islower():  
+        if smart and out and part[0].islower():
             out[-1] = f"{out[-1]}, {part}"
         elif part not in out:
             out.append(part)
@@ -213,7 +213,7 @@ def parse_row(cells: list[str], cols: dict, formats: list[str]) -> tuple[dict, l
     created_at = parse_timestamp(cell(cols["ts"]), formats)
 
     row: dict = {
-        "place_code": place_code,  
+        "place_code": place_code,
         "import_key": f"{created_at.isoformat()}|{place_code}",
         "created_at": created_at,
         "source": "sheet",
@@ -240,9 +240,9 @@ def parse_row(cells: list[str], cols: dict, formats: list[str]) -> tuple[dict, l
 
 def load_csv(path: Path, formats: list[str]) -> tuple[list[dict], list[str], list[str]]:
     rows, errors, warnings = [], [], []
-    seen: dict[str, list[tuple]] = {} 
+    seen: dict[str, list[tuple]] = {}
 
-    with path.open(encoding="utf-8-sig", newline="") as f:  
+    with path.open(encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
         header = next(reader, None)
         if header is None:
@@ -251,7 +251,7 @@ def load_csv(path: Path, formats: list[str]) -> tuple[list[dict], list[str], lis
 
         for line, cells in enumerate(reader, start=2):
             if not any(c.strip() for c in cells):
-                continue  
+                continue
             try:
                 row, warns = parse_row(cells, cols, formats)
             except ValueError as e:
@@ -295,7 +295,7 @@ async def upsert(rows: list[dict]) -> None:
     from app.modules.reviews.models import Review
 
     async with SessionLocal() as session:
-        for start in range(0, len(rows), 500):  
+        for start in range(0, len(rows), 500):
             stmt = insert(Review).values(rows[start : start + 500])
             stmt = stmt.on_conflict_do_update(
                 index_elements=[Review.import_key],
