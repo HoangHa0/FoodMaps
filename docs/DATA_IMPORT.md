@@ -93,7 +93,66 @@ uv run python scripts/import_reviews.py ../data/raw/reviews.csv
 
 The import can be run again whenever the Google Form data is updated.
 
-## 4. File Location and Naming
+## 4. Backfill Place Prices
+
+After importing new places and reviews, you need to update the aggregated price data for restaurants based on the reviews.
+
+### 4.1 Preview the backfill
+
+Before modifying the database, run the script in dry-run mode to see which places will be updated:
+
+```bash
+cd backend
+uv run python scripts/backfill_place_prices.py --dry-run
+```
+
+Check the output to ensure the calculated prices (e.g., medians) look correct. Note that the dry-run command will not write anything to the database.
+
+### 4.2 Run the actual backfill
+
+If the dry-run output is expected, run the script without the flag to actually update the database:
+
+```bash
+uv run python scripts/backfill_place_prices.py
+```
+
+## 5. Compute Place Embeddings (Semantic Search)
+
+After importing data and backfilling prices, you must compute vector embeddings for the places to enable semantic search.
+
+### 5.1 Install AI Dependencies
+
+If this is your first time running the embedding script on your machine, you need to install the heavy AI libraries (like PyTorch and sentence-transformers). This step downloads a few gigabytes of data:
+
+```bash
+cd backend
+uv sync --extra ai
+```
+
+### 5.2 Run the Embedding Script
+
+Always check the text output before running the actual heavy computation and database writes.
+
+1. **Dry-run (Preview):** Check the formatted text to ensure it looks correct. This does not load the AI model or write to the database.
+
+   ```bash
+   uv run python scripts/compute_embeddings.py --dry-run
+   ```
+
+2. **Actual run:** Generate the embeddings and save them to the database. The first run will take some time to download the model (~500MB).
+   ```bash
+   uv run python scripts/compute_embeddings.py
+   ```
+
+### 5.3 Verify the Results
+
+Check that the vectors were correctly saved with 384 dimensions and match the number of places in the database:
+
+```bash
+docker compose exec db psql -U foodmaps -d foodmaps -c "SELECT p.place_code, vector_dims(e.embedding) AS dims FROM place_embeddings e JOIN places p USING(place_id) ORDER BY 1 LIMIT 10"
+```
+
+## 6. File Location and Naming
 
 Both raw data files must be stored in the same directory:
 
@@ -113,7 +172,7 @@ Use these exact file names:
 
 These files are local data files and are ignored by Git. Do not commit them to the repository.
 
-## 5. Recommended Update Flow
+## 7. Recommended Update Flow
 
 When new restaurant or review data is available:
 
@@ -126,22 +185,30 @@ Update source data
       │
       └── reviews.csv
               ↓
-          Run --dry-run
+          Run --dry-run (Reviews)
               ↓
           Check output
               ↓
           Delete old sheet reviews
               ↓
           Run actual import
+              ↓
+          Run --dry-run (Backfill Prices)
+              ↓
+          Run actual backfill (backfill_place_prices.py)
+              ↓
+          Run --dry-run (Compute Embeddings)
+              ↓
+          Run actual compute embeddings (compute_embeddings.py)
 ```
 
-For reviews, always run the `--dry-run` version before the real import.
+For reviews, price backfilling, and embeddings, always run the `--dry-run` version before the real import/update.
 
-## 6. Important Notes
+## 8. Important Notes
 
 - `data/raw/places.csv` and `data/raw/reviews.csv` are local data files and should not be committed to Git.
 - Both files must be stored in the `data/raw/` directory with the exact file names specified above.
 - Use the provided import scripts instead of manually inserting data into PostgreSQL.
 - For reviews, only records with `source = 'sheet'` are replaced during a Google Form refresh.
 - User-submitted reviews (`source = 'user'`) must not be deleted during the sheet import process.
-- If the import script reports errors during `--dry-run`, fix the source data or importer before running the real import.
+- If any import script reports errors during `--dry-run`, fix the source data or script before running the real import.
