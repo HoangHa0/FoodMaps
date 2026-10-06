@@ -16,15 +16,19 @@ From the project root:
 make db
 ```
 
----
-
 ## 2. Import Restaurant Data
 
-Restaurant data is stored locally as:
+Restaurant data must be stored in the `data/raw/` directory with the following file name:
 
 ```text
-data/raw/places.csv
+data/
+└── raw/
+    └── places.csv
 ```
+
+Use this exact file path and file name: `data/raw/places.csv`
+
+**Important:** Do not rename the file or place it in another directory unless the import command is updated accordingly.
 
 Run the Places import script from the `backend/` directory:
 
@@ -35,20 +39,25 @@ uv run python scripts/import_places.py ../data/raw/places.csv
 
 After importing, verify that the expected restaurant records are present in the database.
 
----
-
 ## 3. Import Review Data
 
 Review data comes from the team's internal Google Form.
 
 ### 3.1 Export the Google Form responses
 
-Export the latest Google Form responses as a CSV file and save it to:
+Export the latest Google Form responses as a CSV file.
+The CSV file must be saved in the `data/raw/` directory with the following exact file name:
 
 ```text
-data/raw/reviews.csv
+data/
+└── raw/
+    ├── places.csv
+    └── reviews.csv
 ```
 
+Use this exact file path and file name: `data/raw/reviews.csv`
+
+**Important:** Do not rename the file or place it in another directory unless the import command is updated accordingly.
 The file is ignored by Git and should not be committed.
 
 ### 3.2 Preview the import
@@ -70,19 +79,9 @@ If the dry-run output is clean, remove the reviews previously imported from the 
 docker compose exec db psql -U foodmaps -d foodmaps -c "DELETE FROM reviews WHERE source = 'sheet';"
 ```
 
-This only removes reviews with:
+This only removes reviews with: `source = 'sheet'`
 
-```text
-source = 'sheet'
-```
-
-User-submitted reviews with:
-
-```text
-source = 'user'
-```
-
-are not affected.
+User-submitted reviews with: `source = 'user'` are not affected.
 
 ### 3.4 Run the actual import
 
@@ -94,9 +93,27 @@ uv run python scripts/import_reviews.py ../data/raw/reviews.csv
 
 The import can be run again whenever the Google Form data is updated.
 
----
+## 4. File Location and Naming
 
-## 4. Recommended Update Flow
+Both raw data files must be stored in the same directory:
+
+```text
+data/
+└── raw/
+    ├── places.csv
+    └── reviews.csv
+```
+
+Use these exact file names:
+
+| Data            | File                   |
+| :-------------- | :--------------------- |
+| Restaurant data | `data/raw/places.csv`  |
+| Review data     | `data/raw/reviews.csv` |
+
+These files are local data files and are ignored by Git. Do not commit them to the repository.
+
+## 5. Recommended Update Flow
 
 When new restaurant or review data is available:
 
@@ -120,11 +137,10 @@ Update source data
 
 For reviews, always run the `--dry-run` version before the real import.
 
----
-
-## 5. Important Notes
+## 6. Important Notes
 
 - `data/raw/places.csv` and `data/raw/reviews.csv` are local data files and should not be committed to Git.
+- Both files must be stored in the `data/raw/` directory with the exact file names specified above.
 - Use the provided import scripts instead of manually inserting data into PostgreSQL.
 - For reviews, only records with `source = 'sheet'` are replaced during a Google Form refresh.
 - User-submitted reviews (`source = 'user'`) must not be deleted during the sheet import process.
