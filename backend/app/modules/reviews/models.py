@@ -90,3 +90,37 @@ class Review(Base):
         CheckConstraint("score_price BETWEEN 1 AND 5", name="score_price_range"),
         CheckConstraint("score_service BETWEEN 1 AND 5", name="score_service_range"),
     )
+
+
+REPORT_REASONS = ("spam", "offensive", "wrong_place", "other")
+
+
+class ReviewReport(Base):
+    """A user reporting someone else's review ("Báo cáo" button).
+
+    One report per (review, reporter): reporting twice is rejected, so a single person cannot
+    push a review over the auto-flag threshold. Deleting the review or the reporter deletes
+    the report. An admin/dev decides by hand whether to set `reviews.status = 'hidden'`.
+    """
+
+    __tablename__ = "reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    review_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    reporter_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("review_id", "reporter_id", name="uq_reports_review_reporter"),
+        CheckConstraint("reason IN ('spam', 'offensive', 'wrong_place', 'other')", name="reason_valid"),
+    )
