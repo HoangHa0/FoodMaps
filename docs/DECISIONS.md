@@ -8,13 +8,13 @@ trade-offs, and when to revisit**. Add new decisions at the end; never delete ol
 
 ## D1. Database: PostgreSQL 16 + PostGIS + pgvector, one database
 
-| Criterion | PostgreSQL + extensions | SQLite | MySQL | MongoDB | Firebase / Firestore |
-|---|---|---|---|---|---|
-| Vector search (M3) | ✅ pgvector: filter and rank in one SQL query | ⚠️ sqlite-vec is immature | ❌ only recent/managed editions | ⚠️ Atlas Vector Search, cloud only | ❌ needs an external service |
-| Geospatial queries (radius, walking distance: M2, M6) | ✅ PostGIS, the industry standard | ⚠️ SpatiaLite, awkward to install | ⚠️ basic | ⚠️ basic 2dsphere | ❌ manual geohashing |
-| Integrity constraints (unique user+place, one vote per person per place, transactional decisions) | ✅ | ✅ | ✅ | ⚠️ weaker | ❌ |
-| Concurrent writers (votes in a room) | ✅ row locks (`FOR UPDATE`) | ❌ whole-file lock | ✅ | ✅ | ✅ |
-| Free hosting with both extensions | ✅ Supabase, Neon | ❌ not on serverless hosts | ⚠️ | ✅ Atlas | ✅ |
+| Criterion                                                                                         | PostgreSQL + extensions                       | SQLite                            | MySQL                           | MongoDB                            | Firebase / Firestore         |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------- | ------------------------------- | ---------------------------------- | ---------------------------- |
+| Vector search (M3)                                                                                | ✅ pgvector: filter and rank in one SQL query | ⚠️ sqlite-vec is immature         | ❌ only recent/managed editions | ⚠️ Atlas Vector Search, cloud only | ❌ needs an external service |
+| Geospatial queries (radius, walking distance: M2, M6)                                             | ✅ PostGIS, the industry standard             | ⚠️ SpatiaLite, awkward to install | ⚠️ basic                        | ⚠️ basic 2dsphere                  | ❌ manual geohashing         |
+| Integrity constraints (unique user+place, one vote per person per place, transactional decisions) | ✅                                            | ✅                                | ✅                              | ⚠️ weaker                          | ❌                           |
+| Concurrent writers (votes in a room)                                                              | ✅ row locks (`FOR UPDATE`)                   | ❌ whole-file lock                | ✅                              | ✅                                 | ✅                           |
+| Free hosting with both extensions                                                                 | ✅ Supabase, Neon                             | ❌ not on serverless hosts        | ⚠️                              | ✅ Atlas                           | ✅                           |
 
 **Decision:** PostgreSQL. M3 needs vectors, M2/M6 need geospatial queries and M5 needs
 transactions, and a query such as "places matching this mood, within 2 km, under 100k VND" runs
@@ -63,11 +63,11 @@ backups: check the current plan when creating the project and run `make backup` 
 
 ## D4. Authentication (M1): stateless JWT (HS256) in an httpOnly cookie
 
-| Option | Pros | Cons | Chosen |
-|---|---|---|---|
-| JWT in an **httpOnly cookie** | JavaScript cannot read the token (XSS cannot steal it); sent automatically | Needs CSRF protection | ✅ |
-| JWT in localStorage + Bearer header | Simple | Readable by any XSS | ❌ |
-| Session ID in a `sessions` table | Instant revocation | One database query per request | ❌ (overkill here) |
+| Option                              | Pros                                                                       | Cons                           | Chosen             |
+| ----------------------------------- | -------------------------------------------------------------------------- | ------------------------------ | ------------------ |
+| JWT in an **httpOnly cookie**       | JavaScript cannot read the token (XSS cannot steal it); sent automatically | Needs CSRF protection          | ✅                 |
+| JWT in localStorage + Bearer header | Simple                                                                     | Readable by any XSS            | ❌                 |
+| Session ID in a `sessions` table    | Instant revocation                                                         | One database query per request | ❌ (overkill here) |
 
 - Claims: `sub` (user id) and `username`; expires after 7 days; no refresh token. The auth
   dependency **only decodes the JWT, without a database query**, so it is cheap on every endpoint.
@@ -82,12 +82,12 @@ backups: check the current plan when creating the project and run `make backup` 
 
 ## D5. Group Session real-time updates: HTTP polling with a version number
 
-| Option | Effort | Works on free hosting | Notes |
-|---|---|---|---|
-| **Polling every 3 s + `since_version`** | Low | ✅ everywhere | Easy to debug in DevTools |
-| Server-Sent Events | Medium | ⚠️ long connections cut by some proxies | Good upgrade path |
-| WebSocket | High | ⚠️ | Out of scope |
-| Supabase Realtime | Medium | ✅ | Locks us into Supabase; decision logic must stay in the backend anyway |
+| Option                                  | Effort | Works on free hosting                   | Notes                                                                  |
+| --------------------------------------- | ------ | --------------------------------------- | ---------------------------------------------------------------------- |
+| **Polling every 3 s + `since_version`** | Low    | ✅ everywhere                           | Easy to debug in DevTools                                              |
+| Server-Sent Events                      | Medium | ⚠️ long connections cut by some proxies | Good upgrade path                                                      |
+| WebSocket                               | High   | ⚠️                                      | Out of scope                                                           |
+| Supabase Realtime                       | Medium | ✅                                      | Locks us into Supabase; decision logic must stay in the backend anyway |
 
 **Estimated load:** 10 people × 1 request / 3 s ≈ 3.3 req/s per room; 5 simultaneous rooms
 ≈ 17 req/s, each costing 1–3 indexed queries. Negligible.
@@ -112,11 +112,11 @@ later changes that hook only.
 
 ## D7. Deployment
 
-| Component | Where | Notes |
-|---|---|---|
-| Frontend | Vercel | `BACKEND_URL` points at the backend |
-| Backend | Render / Railway / Fly.io, Singapore region | Run `alembic upgrade head` before start. Free instances sleep when idle: open the app a few minutes before a demo |
-| Demo database | Supabase, Singapore | Separate project from any development database |
+| Component     | Where                                       | Notes                                                                                                             |
+| ------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Frontend      | Vercel                                      | `BACKEND_URL` points at the backend                                                                               |
+| Backend       | Render / Railway / Fly.io, Singapore region | Run `alembic upgrade head` before start. Free instances sleep when idle: open the app a few minutes before a demo |
+| Demo database | Supabase, Singapore                         | Separate project from any development database                                                                    |
 
 AI Match (M3): sentence-transformers + torch need significant RAM and may exceed a free backend
 instance. Compute place embeddings **offline** (scripts in `data/`), encode only the user's query
@@ -143,3 +143,51 @@ at runtime, prefer a small model, and measure memory early.
   backups also runs in a container.
 - CI runs an extra job on `windows-latest` using Git Bash + make, to catch Windows-specific
   problems early.
+
+## D10. AI Match (M3): how the Match Score is computed
+
+Candidates come from one SQL query (pgvector cosine similarity, bounding box, category, own review
+average); scoring is done by pure functions in `modules/match/scoring.py`, so it is unit-tested
+without a database. Group Session and Food Journey reuse the same pipeline through
+`MatchCandidateProvider` (only `k` differs).
+
+**Formula.** Weighted average of four components, each in 0..1:
+
+| Component | Weight | Meaning                                                                        |
+| --------- | ------ | ------------------------------------------------------------------------------ |
+| semantic  | 0.55   | cosine similarity between the mood and the place embedding, calibrated (below) |
+| distance  | 0.20   | 1 at the origin, 0 at the edge of the radius (straight-line)                   |
+| rating    | 0.15   | average of our own reviews, shrunk towards a neutral prior                     |
+| budget    | 0.10   | 1 when the price is inside `[price_min, price_max]`                            |
+
+A component that does not apply (no origin, no budget) is dropped and the remaining weights are
+re-normalised, so a search without a location is not punished. Ties are broken by `place_id`, so
+the same input always gives the same output.
+
+**Decisions**
+
+- **Fixed calibration, not min-max.** MiniLM cosine is typically 0.2-0.6, so it cannot be shown as
+  a percentage. We map `0.15 → 0` and `0.60 → 1` (`SIM_LOW`, `SIM_HIGH`). Min-max inside the
+  candidate group would always give the top place 100% and breaks with a single candidate. The two
+  constants are meant to be tuned on real data (`scripts/try_match.py` prints the numbers).
+- **Rating comes from our own reviews** (sheet + web, `status = visible`), not from Google: Google
+  forbids storing ratings and calling it live for every candidate is slow and costs quota. The
+  score is a Bayesian average (prior 3.5, weight 3 reviews), so one 5-star review does not beat
+  ten 4.5-star reviews, and a place without reviews gets a neutral score instead of a penalty. The
+  card shows the plain average and the review count.
+- **Radius and budget are hard filters**, applied before scoring, with no tolerance: a place
+  above `price_max` or below `price_min` is dropped, and the radius is checked with an exact
+  haversine distance. A place with an unknown price is kept, because we cannot prove it is out of
+  budget.
+- **Price on the card** is the stored `places.price_per_person` (median of the reviews, filled by
+  `scripts/backfill_place_prices.py`), shown as one number ("Khoảng 40.000đ/người") so it matches
+  what the filter compared. **Distance** is straight-line, so the text says "Cách khoảng".
+- **Results:** 1 best place + up to 3 backups (`BACKUP_COUNT`). The client keeps the backup list,
+  so the "Không hợp" reroll needs no server-side state.
+- **Only the current embedding model is matched** (`model_name = EMBED_MODEL`): vectors from
+  different models are not comparable.
+- **No Google data is stored or returned.** The API returns `place_id`; name and photo come from
+  the google_places module (M7). While the AI pipeline is not configured,
+  `USE_STUB_MATCH=true` returns sample data so the UI can be built first.
+
+**Known limits.** Distance ignores real roads.
