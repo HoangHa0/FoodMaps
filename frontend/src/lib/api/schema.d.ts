@@ -281,10 +281,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reviews
+         * @description Visible reviews written on the website, newest first (guests allowed).
+         *     `is_mine` marks the caller's own.
+         *
+         *     Internal reviews imported from the team's form are not listed; they only feed Match and Analysis.
+         */
+        get: operations["list_reviews_api_reviews_get"];
+        put?: never;
+        /**
+         * Create Review
+         * @description Write a review. 409 if the caller already reviewed this place (edit it instead); 429 if too fast.
+         *
+         *     A review that trips the text filter is saved with status `flagged`: only its author sees it.
+         */
+        post: operations["create_review_api_reviews_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/analysis/{place_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analysis
+         * @description Review Analysis: 4 aspect scores, most mentioned dishes, pros/cons, tags (guests allowed).
+         */
+        get: operations["analysis_api_reviews_analysis__place_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Review
+         * @description The caller's own review of a place (any status). 404 = they have not reviewed it yet.
+         */
+        get: operations["my_review_api_reviews_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/{review_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Review
+         * @description Replace the editable fields of the caller's own review. Not rate limited.
+         */
+        put: operations["update_review_api_reviews__review_id__put"];
+        post?: never;
+        /**
+         * Delete Review
+         * @description Delete the caller's own review.
+         */
+        delete: operations["delete_review_api_reviews__review_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/{review_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Review
+         * @description 'Báo cáo' button. One report per person per review; 3 different reporters flag it.
+         */
+        post: operations["report_review_api_reviews__review_id__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AspectScores
+         * @description Average of 1..5 scores per aspect, rounded to 1 decimal; null when there is no review.
+         */
+        AspectScores: {
+            /** Food */
+            food: number | null;
+            /** Price */
+            price: number | null;
+            /** Service */
+            service: number | null;
+            /** Space */
+            space: number | null;
+        };
         /**
          * AuthUser
          * @description All that other modules ever see of a user: no password hash, no ORM object.
@@ -498,6 +625,221 @@ export interface components {
          * @enum {string}
          */
         RejectReason: "too_far" | "too_expensive" | "too_crowded" | "wrong_vibe";
+        /** ReportIn */
+        ReportIn: {
+            /** Note */
+            note?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "spam" | "offensive" | "wrong_place" | "other";
+        };
+        /** ReportOut */
+        ReportOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "spam" | "offensive" | "wrong_place" | "other";
+            /**
+             * Review Id
+             * Format: uuid
+             */
+            review_id: string;
+        };
+        /**
+         * ReviewAnalysisOut
+         * @description Summary of the visible reviews of one place, computed with plain code (no LLM).
+         */
+        ReviewAnalysisOut: {
+            aspects: components["schemas"]["AspectScores"];
+            /** Atmosphere */
+            atmosphere: components["schemas"]["TermCount"][];
+            /** Cons */
+            cons: components["schemas"]["TermCount"][];
+            /**
+             * Crowd Level
+             * @description most common answer, null when nobody said
+             */
+            crowd_level: string | null;
+            /**
+             * Dishes
+             * @description most mentioned recommended dishes
+             */
+            dishes: components["schemas"]["TermCount"][];
+            /**
+             * Overall
+             * @description mean of the four aspect averages, 1 decimal
+             */
+            overall: number | null;
+            /** Place Id */
+            place_id: string;
+            /** Pros */
+            pros: components["schemas"]["TermCount"][];
+            /** Review Count */
+            review_count: number;
+            /**
+             * Sheet Review Count
+             * @description reviews imported from the team's form
+             */
+            sheet_review_count: number;
+            /** Suitable For */
+            suitable_for: components["schemas"]["TermCount"][];
+            /**
+             * Typical Price
+             * @description median VND per person, null when nobody said
+             */
+            typical_price: number | null;
+            /**
+             * User Review Count
+             * @description reviews written on the website
+             */
+            user_review_count: number;
+        };
+        /** ReviewIn */
+        ReviewIn: {
+            /**
+             * Comment
+             * @description free text; an empty string is stored as null
+             */
+            comment?: string | null;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Price Per Person
+             * @description optional: VND spent per person
+             */
+            price_per_person?: number | null;
+            /**
+             * Recommended Dishes
+             * @description optional: dishes worth trying
+             */
+            recommended_dishes?: string[];
+            /** Score Food */
+            score_food: number;
+            /** Score Price */
+            score_price: number;
+            /** Score Service */
+            score_service: number;
+            /** Score Space */
+            score_space: number;
+            /**
+             * Suitable For
+             * @description optional: 'date', 'học bài', 'đi nhóm'...
+             */
+            suitable_for?: string[];
+        };
+        /** ReviewListOut */
+        ReviewListOut: {
+            /** Items */
+            items: components["schemas"]["ReviewOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /**
+             * Total
+             * @description number of visible reviews of the place (for paging)
+             */
+            total: number;
+        };
+        /** ReviewOut */
+        ReviewOut: {
+            /**
+             * Author
+             * @description username; null for reviews imported from the team's form
+             */
+            author: string | null;
+            /** Comment */
+            comment: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Mine
+             * @description true when the caller wrote it: show the edit/delete buttons
+             */
+            is_mine: boolean;
+            /** Place Id */
+            place_id: string;
+            /** Price Per Person */
+            price_per_person: number | null;
+            /** Recommended Dishes */
+            recommended_dishes: string[];
+            /** Score Food */
+            score_food: number;
+            /** Score Price */
+            score_price: number;
+            /** Score Service */
+            score_service: number;
+            /** Score Space */
+            score_space: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "sheet";
+            /**
+             * Status
+             * @description other people only ever see 'visible'; the author may also see 'flagged'
+             * @enum {string}
+             */
+            status: "visible" | "flagged" | "hidden";
+            /** Suitable For */
+            suitable_for: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * ReviewUpdateIn
+         * @description PUT replaces every editable field, so the form can send the whole object back.
+         */
+        ReviewUpdateIn: {
+            /**
+             * Comment
+             * @description free text; an empty string is stored as null
+             */
+            comment?: string | null;
+            /**
+             * Price Per Person
+             * @description optional: VND spent per person
+             */
+            price_per_person?: number | null;
+            /**
+             * Recommended Dishes
+             * @description optional: dishes worth trying
+             */
+            recommended_dishes?: string[];
+            /** Score Food */
+            score_food: number;
+            /** Score Price */
+            score_price: number;
+            /** Score Service */
+            score_service: number;
+            /** Score Space */
+            score_space: number;
+            /**
+             * Suitable For
+             * @description optional: 'date', 'học bài', 'đi nhóm'...
+             */
+            suitable_for?: string[];
+        };
         /** RoomStateOut */
         RoomStateOut: {
             /**
@@ -551,6 +893,16 @@ export interface components {
         /** StartIn */
         StartIn: {
             criteria: components["schemas"]["MatchCriteria"];
+        };
+        /** TermCount */
+        TermCount: {
+            /**
+             * Mentions
+             * @description how many reviews mention it
+             */
+            mentions: number;
+            /** Name */
+            name: string;
         };
         /** UserOut */
         UserOut: {
@@ -1130,6 +1482,350 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    list_reviews_api_reviews_get: {
+        parameters: {
+            query: {
+                place_id: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewListOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_review_api_reviews_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    analysis_api_reviews_analysis__place_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                place_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAnalysisOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_review_api_reviews_mine_get: {
+        parameters: {
+            query: {
+                place_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_review_api_reviews__review_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_review_api_reviews__review_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_review_api_reviews__review_id__report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

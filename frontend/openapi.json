@@ -1,6 +1,63 @@
 {
   "components": {
     "schemas": {
+      "AspectScores": {
+        "description": "Average of 1..5 scores per aspect, rounded to 1 decimal; null when there is no review.",
+        "properties": {
+          "food": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "space": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space"
+          }
+        },
+        "required": [
+          "food",
+          "space",
+          "price",
+          "service"
+        ],
+        "title": "AspectScores",
+        "type": "object"
+      },
       "AuthUser": {
         "description": "All that other modules ever see of a user: no password hash, no ORM object.",
         "properties": {
@@ -465,6 +522,523 @@
         "title": "RejectReason",
         "type": "string"
       },
+      "ReportIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reason": {
+            "enum": [
+              "spam",
+              "offensive",
+              "wrong_place",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReportIn",
+        "type": "object"
+      },
+      "ReportOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "spam",
+              "offensive",
+              "wrong_place",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "review_id": {
+            "format": "uuid",
+            "title": "Review Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "review_id",
+          "reason",
+          "created_at"
+        ],
+        "title": "ReportOut",
+        "type": "object"
+      },
+      "ReviewAnalysisOut": {
+        "description": "Summary of the visible reviews of one place, computed with plain code (no LLM).",
+        "properties": {
+          "aspects": {
+            "$ref": "#/components/schemas/AspectScores"
+          },
+          "atmosphere": {
+            "items": {
+              "$ref": "#/components/schemas/TermCount"
+            },
+            "title": "Atmosphere",
+            "type": "array"
+          },
+          "cons": {
+            "items": {
+              "$ref": "#/components/schemas/TermCount"
+            },
+            "title": "Cons",
+            "type": "array"
+          },
+          "crowd_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "most common answer, null when nobody said",
+            "title": "Crowd Level"
+          },
+          "dishes": {
+            "description": "most mentioned recommended dishes",
+            "items": {
+              "$ref": "#/components/schemas/TermCount"
+            },
+            "title": "Dishes",
+            "type": "array"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "mean of the four aspect averages, 1 decimal",
+            "title": "Overall"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "pros": {
+            "items": {
+              "$ref": "#/components/schemas/TermCount"
+            },
+            "title": "Pros",
+            "type": "array"
+          },
+          "review_count": {
+            "title": "Review Count",
+            "type": "integer"
+          },
+          "sheet_review_count": {
+            "description": "reviews imported from the team's form",
+            "title": "Sheet Review Count",
+            "type": "integer"
+          },
+          "suitable_for": {
+            "items": {
+              "$ref": "#/components/schemas/TermCount"
+            },
+            "title": "Suitable For",
+            "type": "array"
+          },
+          "typical_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "median VND per person, null when nobody said",
+            "title": "Typical Price"
+          },
+          "user_review_count": {
+            "description": "reviews written on the website",
+            "title": "User Review Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place_id",
+          "review_count",
+          "user_review_count",
+          "sheet_review_count",
+          "overall",
+          "aspects",
+          "dishes",
+          "pros",
+          "cons",
+          "suitable_for",
+          "atmosphere",
+          "crowd_level",
+          "typical_price"
+        ],
+        "title": "ReviewAnalysisOut",
+        "type": "object"
+      },
+      "ReviewIn": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "free text; an empty string is stored as null",
+            "title": "Comment"
+          },
+          "place_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "maximum": 5000000.0,
+                "minimum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "optional: VND spent per person",
+            "title": "Price Per Person"
+          },
+          "recommended_dishes": {
+            "description": "optional: dishes worth trying",
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Recommended Dishes",
+            "type": "array"
+          },
+          "score_food": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Food",
+            "type": "integer"
+          },
+          "score_price": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Price",
+            "type": "integer"
+          },
+          "score_service": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Service",
+            "type": "integer"
+          },
+          "score_space": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Space",
+            "type": "integer"
+          },
+          "suitable_for": {
+            "description": "optional: 'date', 'học bài', 'đi nhóm'...",
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Suitable For",
+            "type": "array"
+          }
+        },
+        "required": [
+          "score_food",
+          "score_space",
+          "score_price",
+          "score_service",
+          "place_id"
+        ],
+        "title": "ReviewIn",
+        "type": "object"
+      },
+      "ReviewListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "description": "number of visible reviews of the place (for paging)",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "ReviewListOut",
+        "type": "object"
+      },
+      "ReviewOut": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "username; null for reviews imported from the team's form",
+            "title": "Author"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_mine": {
+            "description": "true when the caller wrote it: show the edit/delete buttons",
+            "title": "Is Mine",
+            "type": "boolean"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Per Person"
+          },
+          "recommended_dishes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recommended Dishes",
+            "type": "array"
+          },
+          "score_food": {
+            "title": "Score Food",
+            "type": "integer"
+          },
+          "score_price": {
+            "title": "Score Price",
+            "type": "integer"
+          },
+          "score_service": {
+            "title": "Score Service",
+            "type": "integer"
+          },
+          "score_space": {
+            "title": "Score Space",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "user",
+              "sheet"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "other people only ever see 'visible'; the author may also see 'flagged'",
+            "enum": [
+              "visible",
+              "flagged",
+              "hidden"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suitable_for": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suitable For",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "place_id",
+          "author",
+          "source",
+          "score_food",
+          "score_space",
+          "score_price",
+          "score_service",
+          "comment",
+          "recommended_dishes",
+          "suitable_for",
+          "price_per_person",
+          "status",
+          "is_mine",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ReviewOut",
+        "type": "object"
+      },
+      "ReviewUpdateIn": {
+        "description": "PUT replaces every editable field, so the form can send the whole object back.",
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "free text; an empty string is stored as null",
+            "title": "Comment"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "maximum": 5000000.0,
+                "minimum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "optional: VND spent per person",
+            "title": "Price Per Person"
+          },
+          "recommended_dishes": {
+            "description": "optional: dishes worth trying",
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Recommended Dishes",
+            "type": "array"
+          },
+          "score_food": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Food",
+            "type": "integer"
+          },
+          "score_price": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Price",
+            "type": "integer"
+          },
+          "score_service": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Service",
+            "type": "integer"
+          },
+          "score_space": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score Space",
+            "type": "integer"
+          },
+          "suitable_for": {
+            "description": "optional: 'date', 'học bài', 'đi nhóm'...",
+            "items": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Suitable For",
+            "type": "array"
+          }
+        },
+        "required": [
+          "score_food",
+          "score_space",
+          "score_price",
+          "score_service"
+        ],
+        "title": "ReviewUpdateIn",
+        "type": "object"
+      },
       "RoomStateOut": {
         "properties": {
           "candidates": {
@@ -581,6 +1155,25 @@
           "criteria"
         ],
         "title": "StartIn",
+        "type": "object"
+      },
+      "TermCount": {
+        "properties": {
+          "mentions": {
+            "description": "how many reviews mention it",
+            "title": "Mentions",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "mentions"
+        ],
+        "title": "TermCount",
         "type": "object"
       },
       "UserOut": {
@@ -1347,6 +1940,389 @@
         "summary": "Why",
         "tags": [
           "M3 match"
+        ]
+      }
+    },
+    "/api/reviews": {
+      "get": {
+        "description": "Visible reviews written on the website, newest first (guests allowed).\n`is_mine` marks the caller's own.\n\nInternal reviews imported from the team's form are not listed; they only feed Match and Analysis.",
+        "operationId": "list_reviews_api_reviews_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Place Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reviews",
+        "tags": [
+          "M4 reviews"
+        ]
+      },
+      "post": {
+        "description": "Write a review. 409 if the caller already reviewed this place (edit it instead); 429 if too fast.\n\nA review that trips the text filter is saved with status `flagged`: only its author sees it.",
+        "operationId": "create_review_api_reviews_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Create Review",
+        "tags": [
+          "M4 reviews"
+        ]
+      }
+    },
+    "/api/reviews/analysis/{place_id}": {
+      "get": {
+        "description": "Review Analysis: 4 aspect scores, most mentioned dishes, pros/cons, tags (guests allowed).",
+        "operationId": "analysis_api_reviews_analysis__place_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewAnalysisOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analysis",
+        "tags": [
+          "M4 reviews"
+        ]
+      }
+    },
+    "/api/reviews/mine": {
+      "get": {
+        "description": "The caller's own review of a place (any status). 404 = they have not reviewed it yet.",
+        "operationId": "my_review_api_reviews_mine_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Review",
+        "tags": [
+          "M4 reviews"
+        ]
+      }
+    },
+    "/api/reviews/{review_id}": {
+      "delete": {
+        "description": "Delete the caller's own review.",
+        "operationId": "delete_review_api_reviews__review_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Review",
+        "tags": [
+          "M4 reviews"
+        ]
+      },
+      "put": {
+        "description": "Replace the editable fields of the caller's own review. Not rate limited.",
+        "operationId": "update_review_api_reviews__review_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Review",
+        "tags": [
+          "M4 reviews"
+        ]
+      }
+    },
+    "/api/reviews/{review_id}/report": {
+      "post": {
+        "description": "'Báo cáo' button. One report per person per review; 3 different reporters flag it.",
+        "operationId": "report_review_api_reviews__review_id__report_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Report Review",
+        "tags": [
+          "M4 reviews"
         ]
       }
     }

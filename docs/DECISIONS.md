@@ -191,3 +191,29 @@ the same input always gives the same output.
   `USE_STUB_MATCH=true` returns sample data so the UI can be built first.
 
 **Known limits.** Distance ignores real roads.
+
+## D11. Reviews (M4): ownership, moderation, rate limit, reports and Review Analysis
+
+Website reviews are the long-term data source (the team's Google Form import is a one-off), so
+the rules below protect their quality without adding infrastructure.
+
+**API** (`/api/reviews`): `GET ?place_id=` (list of website reviews, guests allowed), `GET /mine?place_id=`
+(own review, any status, to pre-fill the form), `POST`, `PUT /{id}`, `DELETE /{id}` (author only),
+`POST /{id}/report`, `GET /analysis/{place_id}`.
+
+| Decision                                                                                                                                                                         | Why                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` on a place the user already reviewed returns **409 `review_exists`**; the client switches to `PUT`                                                                        | Explicit REST behaviour; the unique `(user_id, place_id)` constraint is the final guard against races                                                                                                                                   |
+| Reviews imported from the form (`user_id` NULL) can **not** be edited or deleted through the API                                                                                 | They have no author; they are changed by re-running the import                                                                                                                                                                          |
+| Reviews imported from the form (`source = 'sheet'`) are **never listed or reportable** through the API; they still count in Match (rating, tags), embeddings and Review Analysis | They are internal data that makes search and the analysis work, not website content. The frontend also ignores `source = 'sheet'` as a second guard. Note `review_count` in the analysis includes them, while the list `total` does not |
+| Web form: 4 scores (required), comment, and optional `recommended_dishes`, `suitable_for`, `price_per_person`                                                                    | Same fields the sheet reviews have, so Match tags, embeddings and Review Analysis treat both sources alike without an LLM                                                                                                               |
+| Text filter (`moderation.py`) flags profanity, links, phone numbers, keyboard-mashing                                                                                            | A hit sets `status = 'flagged'` (soft hide), never a rejection: false positives are cheap. Words that are also normal Vietnamese ("deo", "lon", "cac") are deliberately not listed                                                      |
+| `flagged` and `hidden` reviews are excluded from lists, Review Analysis, Match rating and embeddings                                                                             | Match already reads only `status = 'visible'`; the author still sees a flagged review through `/mine`                                                                                                                                   |
+| 3 different reporters flag a review automatically; `hidden` stays a manual admin decision (SQL)                                                                                  | No admin UI in scope; one person cannot flag alone (unique `(review_id, reporter_id)`)                                                                                                                                                  |
+| Editing: a filter-flagged review that becomes clean turns `visible` again; report-flagged and `hidden` stay                                                                      | Fixing a typo must not be a way to erase reports or an admin's decision                                                                                                                                                                 |
+| Rate limit: 5 new reviews per user per 10 minutes, counted in PostgreSQL; editing is not limited                                                                                 | No Redis (D1). Known limit: it counts existing rows, so delete + re-create resets it                                                                                                                                                    |
+| Review Analysis is plain code (`analysis.py`): aspect averages, top dishes, pros/cons, tags, crowd, median price                                                                 | Free, instant, deterministic. A term counts once per review and is grouped ignoring case and accents, so "Phở bò" = "pho bo"                                                                                                            |
+
+**Not done yet (next tasks).** Embeddings are recomputed offline (`scripts/compute_embeddings.py`),
+so a new website review changes search results only after the script is re-run. `pros` / `cons`
+of website reviews stay empty until an LLM job fills them (Review Analysis already reads them).
