@@ -176,24 +176,24 @@ def format_distance(distance_m: int) -> str:
     return f"{distance_m / 1000:.1f}".replace(".", ",") + " km"  # 2140 -> "2,1 km"
 
 
-MAX_REASONS = 4
+MAX_REASONS = 3
 
 
 def build_reasons(s: Scored) -> list[str]:
-    """Short Vietnamese lines shown on the card, in a fixed order (mood, distance, price, rating).
-
+    """Short Vietnamese lines shown on the card, displaying hard facts only.
+    
     A line is left out when its data is missing (no origin, no price, no review).
+    Semantic score is omitted here because the UI already shows it as a "% MATCH" badge.
     """
     reasons: list[str] = []
-    sem = s.components.get("semantic")
-    if sem is not None and sem >= 0.7:
-        reasons.append("✨ Rất hợp với mood của bạn")
-    elif sem is not None and sem >= 0.4:
-        reasons.append("✨ Khá hợp với mood của bạn")
+    
     if s.distance_m is not None:
         reasons.append(f"📍 Cách khoảng {format_distance(s.distance_m)}")
+        
     if s.price_per_person is not None:
         reasons.append(f"💰 ~ {format_vnd(s.price_per_person)}/người")
+        
     if s.avg_rating is not None and s.n_reviews > 0:
         reasons.append(f"⭐ {s.avg_rating:.1f} ({s.n_reviews} đánh giá)")
+        
     return reasons[:MAX_REASONS]
