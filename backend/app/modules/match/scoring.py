@@ -1,11 +1,11 @@
-"""Match Score: 
+"""Match Score: pure functions (no database, no model, no FastAPI), easy to unit test.
 
 Final score = weighted average of four components, each in 0..1:
 
     semantic  how close the place's embedding is to the mood (cosine similarity, calibrated)
     distance  1 at the origin, 0 at the edge of the radius (skipped when there is no origin)
-    rating    average of our own reviews, shrunk towards a neutral prior 
-    budget    1 inside [price_min, price_max], decays outside it (skipped when no budget is given)
+    rating    average of our own reviews, shrunk towards a neutral prior
+    budget    1 when the price is inside [price_min, price_max] (skipped when no budget is given).
 
 A component that does not apply (no origin, no budget) is dropped and the remaining weights are
 re-normalised, so a search without a location is not punished for it.
@@ -18,7 +18,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-# --- weights (relative; they are re-normalised) -----------------------------------------------
+# --- weights (relative; they are re-normalised) -------------
 W_SEMANTIC = 0.55
 W_DISTANCE = 0.20
 W_RATING = 0.15
@@ -30,9 +30,9 @@ W_BUDGET = 0.10
 SIM_LOW = 0.15
 SIM_HIGH = 0.60
 
-# --- rating -----------------------------------------------------------------------------------
+# --- rating (our own reviews) -----------------------------------------------------------------
 RATING_PRIOR = 3.5  # average score (1..5) assumed for a place with no reviews
-RATING_PRIOR_WEIGHT = 1  # how many "virtual reviews" the prior counts for
+RATING_PRIOR_WEIGHT = 3  # how many "virtual reviews" the prior counts for
 
 # --- budget -----------------------------------------------------------------------------------
 BUDGET_UNKNOWN_SCORE = 0.5  # the place has no price but the user gave a budget
@@ -68,24 +68,24 @@ def rating_score(avg_rating: float | None, n_reviews: int) -> float:
 
 
 def budget_allowed(price: int | None, price_min: int | None, price_max: int | None) -> bool:
-    """Hard filter. Lọc cứng không cho phép vượt. Quán không có giá được giữ lại."""
+    """Hard filter on the exact price stored in the database. No tolerance.
+
+    An unknown price is kept: we cannot prove the place is out of budget.
+    """
     if price is None:
         return True
-    if price_max is not None and price > price_max:
-        return False
     if price_min is not None and price < price_min:
         return False
-    return True
+    return not (price_max is not None and price > price_max)
 
 
 def budget_score(price: int | None, price_min: int | None, price_max: int | None) -> float | None:
-    """None = no budget given. 1.0 = meets budget. 0.5 = unknown price."""
+    """None = no budget given, so the component does not apply."""
     if price_min is None and price_max is None:
         return None
     if price is None:
         return BUDGET_UNKNOWN_SCORE
-
-    return 1.0
+    return 1.0 if budget_allowed(price, price_min, price_max) else 0.0
 
 
 def combine(components: dict[str, float | None]) -> float:
@@ -99,7 +99,7 @@ def combine(components: dict[str, float | None]) -> float:
     total = sum(used.values())
     if total == 0:
         return 0.0
-    return clamp01(sum(components[name] * w for name, w in used.items()) / total) 
+    return clamp01(sum(components[name] * w for name, w in used.items()) / total)  
 
 
 @dataclass(frozen=True)
@@ -124,6 +124,7 @@ class Scored:
     components: dict[str, float | None] = field(default_factory=dict)
     price_per_person: int | None = None
     n_reviews: int = 0
+    avg_rating: float | None = None  # raw mean of the review scores (1..5), NOT the shrunk one
 
 
 def score_candidates(
@@ -156,27 +157,43 @@ def score_candidates(
                 components=components,
                 price_per_person=r.price_per_person,
                 n_reviews=r.n_reviews,
+                avg_rating=r.avg_rating,
             )
         )
-    scored.sort(key=lambda s: (-s.score, s.place_id))  
+    scored.sort(key=lambda s: (-s.score, s.place_id))  # place_id breaks ties: same input, same output
     return scored[:k]
 
 
-def build_reasons(s: Scored, price_given: bool) -> list[str]:
-    """Short Vietnamese reasons shown under the badge. At most 3, strongest signals first."""
+def format_vnd(amount: int) -> str:
+    """Display only: 40000 -> "40.000đ". Same number the budget filter compares, so the card is consistent."""
+    return f"{amount:,}".replace(",", ".") + "đ"
+
+
+def format_distance(distance_m: int) -> str:
+    """Straight-line distance, so the text says "khoảng": it is shorter than the real route."""
+    if distance_m < 1000:
+        return f"{round(distance_m / 50) * 50} m"  # nearest 50 m: 347 -> "350 m"
+    return f"{distance_m / 1000:.1f}".replace(".", ",") + " km"  # 2140 -> "2,1 km"
+
+
+MAX_REASONS = 4
+
+
+def build_reasons(s: Scored) -> list[str]:
+    """Short Vietnamese lines shown on the card, in a fixed order (mood, distance, price, rating).
+
+    A line is left out when its data is missing (no origin, no price, no review).
+    """
     reasons: list[str] = []
     sem = s.components.get("semantic")
     if sem is not None and sem >= 0.7:
-        reasons.append("Rất hợp với mood của bạn")
+        reasons.append("✨ Rất hợp với mood của bạn")
     elif sem is not None and sem >= 0.4:
-        reasons.append("Khá hợp với mood của bạn")
+        reasons.append("✨ Khá hợp với mood của bạn")
     if s.distance_m is not None:
-        d = s.distance_m
-        reasons.append(f"Cách bạn {d} m" if d < 1000 else f"Cách bạn {d / 1000:.1f} km")
-    bud = s.components.get("budget")
-    if price_given and bud == 1.0:
-        reasons.append("Đúng ngân sách")
-    rating = s.components.get("rating")
-    if s.n_reviews >= 2 and rating is not None and rating >= 0.75:
-        reasons.append("Được review đánh giá cao")
-    return reasons[:3]
+        reasons.append(f"📍 Cách khoảng {format_distance(s.distance_m)}")
+    if s.price_per_person is not None:
+        reasons.append(f"💰 ~ {format_vnd(s.price_per_person)}/người")
+    if s.avg_rating is not None and s.n_reviews > 0:
+        reasons.append(f"⭐ {s.avg_rating:.1f} ({s.n_reviews} đánh giá)")
+    return reasons[:MAX_REASONS]

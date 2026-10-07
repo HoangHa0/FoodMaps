@@ -28,24 +28,18 @@ def test_rating_shrinks_towards_prior():
     assert sc.rating_score(None, 0) == pytest.approx((sc.RATING_PRIOR - 1) / 4)
 
 
-def test_budget_is_strict_and_scores_correctly():
-    # Within budget -> score 1.0
-    assert sc.budget_score(80_000, 50_000, 100_000) == 1.0
-    assert sc.budget_allowed(80_000, 50_000, 100_000)
-    
-    # Exceeds maximum -> rejected
+def test_budget_is_strict_no_tolerance():
+    assert sc.budget_allowed(100_000, None, 100_000)  # the edge itself is allowed
     assert not sc.budget_allowed(100_001, None, 100_000)
-    assert not sc.budget_allowed(110_000, None, 100_000)
-    
-    # Below minimum -> rejected
-    assert not sc.budget_allowed(30_000, 50_000, None) 
-    
-    # Missing price -> unknown score and NOT rejected
+    assert not sc.budget_allowed(40_000, None, 35_000)
+    assert not sc.budget_allowed(49_999, 50_000, None) 
+    assert sc.budget_allowed(None, None, 100_000)  # unknown price is kept
+
+
+def test_budget_score():
+    assert sc.budget_score(80_000, 50_000, 100_000) == 1.0
     assert sc.budget_score(None, None, 100_000) == sc.BUDGET_UNKNOWN_SCORE
-    assert sc.budget_allowed(None, None, 100_000)
-    
-    # User does not enter a budget -> this component is not applicable (None)
-    assert sc.budget_score(50_000, None, None) is None
+    assert sc.budget_score(10, None, None) is None
 
 
 def test_combine_drops_missing_components():
@@ -92,7 +86,22 @@ def test_haversine_known_distance():
     assert 1500 < d < 1900
 
 
-def test_reasons_are_short():
-    s = run([raw(sim=0.6, dist=300)], price_max=100_000)[0]
-    reasons = sc.build_reasons(s, price_given=True)
-    assert len(reasons) <= 3 and "Rất hợp với mood của bạn" in reasons
+def test_format_helpers():
+    assert sc.format_vnd(40_000) == "40.000đ"
+    assert sc.format_vnd(1_250_000) == "1.250.000đ"
+    assert sc.format_distance(347) == "350 m"
+    assert sc.format_distance(2140) == "2,1 km"
+
+
+def test_reasons_show_distance_price_and_rating():
+    s = run([raw(sim=0.6, dist=347, price=40_000, avg=4.26, n=12)])[0]
+    reasons = sc.build_reasons(s)
+    assert "📍 Cách khoảng 350 m" in reasons
+    assert "💰 ~ 40.000đ/người" in reasons
+    assert "⭐ 4.3 (12 đánh giá)" in reasons
+    assert len(reasons) <= sc.MAX_REASONS
+
+
+def test_reasons_skip_missing_data():
+    s = run([raw(sim=0.1, dist=None, price=None, avg=None, n=0)])[0]
+    assert sc.build_reasons(s) == []
