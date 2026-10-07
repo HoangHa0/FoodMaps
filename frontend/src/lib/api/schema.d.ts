@@ -290,7 +290,8 @@ export interface paths {
         };
         /**
          * List Reviews
-         * @description Visible reviews written on the website, newest first (guests allowed). `is_mine` marks the caller's own.
+         * @description Visible reviews written on the website, newest first (guests allowed).
+         *     `is_mine` marks the caller's own.
          *
          *     Internal reviews imported from the team's form are not listed; they only feed Match and Analysis.
          */

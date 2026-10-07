@@ -1945,7 +1945,7 @@
     },
     "/api/reviews": {
       "get": {
-        "description": "Visible reviews written on the website, newest first (guests allowed). `is_mine` marks the caller's own.\n\nInternal reviews imported from the team's form are not listed; they only feed Match and Analysis.",
+        "description": "Visible reviews written on the website, newest first (guests allowed).\n`is_mine` marks the caller's own.\n\nInternal reviews imported from the team's form are not listed; they only feed Match and Analysis.",
         "operationId": "list_reviews_api_reviews_get",
         "parameters": [
           {
