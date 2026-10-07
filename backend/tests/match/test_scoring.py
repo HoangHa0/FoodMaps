@@ -32,7 +32,7 @@ def test_budget_is_strict_no_tolerance():
     assert sc.budget_allowed(100_000, None, 100_000)  # the edge itself is allowed
     assert not sc.budget_allowed(100_001, None, 100_000)
     assert not sc.budget_allowed(40_000, None, 35_000)
-    assert not sc.budget_allowed(49_999, 50_000, None) 
+    assert not sc.budget_allowed(49_999, 50_000, None)
     assert sc.budget_allowed(None, None, 100_000)  # unknown price is kept
 
 

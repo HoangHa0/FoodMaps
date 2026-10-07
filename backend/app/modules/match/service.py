@@ -3,7 +3,7 @@
 Other modules must not import this file; expose what they need through app/shared/.
 
 Pipeline (shared by AI Match, Group Session and Food Journey, only `k` differs):
-    1. encode the mood into a vector 
+    1. encode the mood into a vector
     2. ONE SQL query: cosine similarity (pgvector) + bounding box (radius pre-filter) + category
        + our own review average, for every place that has an embedding from the current model
     3. in Python: exact distance, hard filters (radius, budget), Match Score, top k  (scoring.py)
@@ -46,9 +46,7 @@ MAX_TAGS = 4
 def _validate(criteria: MatchCriteria) -> None:
     lo, hi = criteria.price_min, criteria.price_max
     if lo is not None and hi is not None and lo > hi:
-        raise AppError(
-            422, "invalid_budget", "Ngân sách tối thiểu không được lớn hơn tối đa"
-        )
+        raise AppError(422, "invalid_budget", "Ngân sách tối thiểu không được lớn hơn tối đa")
 
 
 def _bounding_box(lat: float, lng: float, radius_m: int) -> tuple[float, float, float, float]:
@@ -62,9 +60,7 @@ async def _encode_mood(mood: str) -> list[float]:
     try:
         return (await run_in_threadpool(encode_queries, [mood]))[0]
     except ImportError:
-        raise AppError(
-            503, "match_unavailable", "Tìm quán bằng AI chưa sẵn sàng, thử lại sau"
-        ) from None
+        raise AppError(503, "match_unavailable", "Tìm quán bằng AI chưa sẵn sàng, thử lại sau") from None
 
 
 async def _tags_for(db: AsyncSession, scored: list[Scored]) -> dict[str, list[str]]:
@@ -127,8 +123,7 @@ class MatchCandidateProvider:
             select(
                 Review.place_id.label("place_id"),
                 func.avg(
-                    (Review.score_food + Review.score_space + Review.score_price + Review.score_service)
-                    / 4.0
+                    (Review.score_food + Review.score_space + Review.score_price + Review.score_service) / 4.0
                 ).label("avg_rating"),
                 func.count().label("n_reviews"),
             )
