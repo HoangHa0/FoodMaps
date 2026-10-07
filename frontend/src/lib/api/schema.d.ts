@@ -221,6 +221,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match
+         * @description One best place + up to 3 backups. With USE_STUB_MATCH=true it returns sample data.
+         */
+        post: operations["match_api_match_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/match/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject
+         * @description 'Không hợp': rerank the remaining backups by the reason. (Task 7, not implemented yet.)
+         */
+        post: operations["reject_api_match_reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/match/{place_id}/why": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why
+         * @description 'Why this place?' written by Gemini. (Task 5, not implemented yet.)
+         */
+        get: operations["why_api_match__place_id__why_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -343,6 +403,57 @@ export interface components {
              */
             radius_m: number;
         };
+        /** MatchResponse */
+        MatchResponse: {
+            /**
+             * Backups
+             * @description up to 3 fallback places, best first; used by the 'Không hợp' button
+             */
+            backups?: components["schemas"]["MatchResult"][];
+            /** @description null when nothing matches the criteria */
+            best: components["schemas"]["MatchResult"] | null;
+        };
+        /**
+         * MatchResult
+         * @description A candidate plus the short reasons behind its score.
+         *
+         *     Inherited from PlaceCandidate: place_id, match_score (0..1, show it as round(score * 100) %),
+         *     tags (3-4 short tags), distance_m (straight-line metres, None when the request has no origin).
+         */
+        MatchResult: {
+            /**
+             * Avg Rating
+             * @description mean of our own reviews (sheet + web), 1..5; null when the place has no review
+             */
+            avg_rating?: number | null;
+            /** Distance M */
+            distance_m?: number | null;
+            /** Match Score */
+            match_score: number;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Price Per Person
+             * @description estimated VND per person (median of the reviews); null if unknown
+             */
+            price_per_person?: number | null;
+            /**
+             * Reasons
+             * @description up to 4 ready-to-show Vietnamese lines (mood, distance, price, rating); a line is omitted when its data is missing. distance_m is straight-line: show it with a '~' or 'khoảng'
+             */
+            reasons?: string[];
+            /**
+             * Review Count
+             * @description number of visible reviews behind avg_rating
+             * @default 0
+             */
+            review_count: number;
+            /**
+             * Tags
+             * @description short system-generated tags
+             */
+            tags?: string[];
+        };
         /** ParticipantOut */
         ParticipantOut: {
             /** Display Name */
@@ -367,6 +478,26 @@ export interface components {
              */
             username: string;
         };
+        /**
+         * RejectIn
+         * @description 'Không hợp': the client keeps the backup list, so the server stays stateless.
+         */
+        RejectIn: {
+            criteria: components["schemas"]["MatchCriteria"];
+            reason: components["schemas"]["RejectReason"];
+            /** Rejected Place Id */
+            rejected_place_id: string;
+            /**
+             * Remaining
+             * @description place_ids of the backups still available (client-side list)
+             */
+            remaining: string[];
+        };
+        /**
+         * RejectReason
+         * @enum {string}
+         */
+        RejectReason: "too_far" | "too_expensive" | "too_crowded" | "wrong_vibe";
         /** RoomStateOut */
         RoomStateOut: {
             /**
@@ -458,6 +589,16 @@ export interface components {
             candidate_id: string;
             /** Liked */
             liked: boolean;
+        };
+        /**
+         * WhyOut
+         * @description 'Why this place?'. Separate endpoint because the LLM call is slow.
+         */
+        WhyOut: {
+            /** Place Id */
+            place_id: string;
+            /** Why */
+            why: string;
         };
     };
     responses: never;
@@ -889,6 +1030,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    match_api_match_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchCriteria"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_match_reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    why_api_match__place_id__why_get: {
+        parameters: {
+            query: {
+                mood: string;
+            };
+            header?: never;
+            path: {
+                place_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -264,6 +264,112 @@
         "title": "MatchCriteria",
         "type": "object"
       },
+      "MatchResponse": {
+        "properties": {
+          "backups": {
+            "description": "up to 3 fallback places, best first; used by the 'Không hợp' button",
+            "items": {
+              "$ref": "#/components/schemas/MatchResult"
+            },
+            "title": "Backups",
+            "type": "array"
+          },
+          "best": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when nothing matches the criteria"
+          }
+        },
+        "required": [
+          "best"
+        ],
+        "title": "MatchResponse",
+        "type": "object"
+      },
+      "MatchResult": {
+        "description": "A candidate plus the short reasons behind its score.\n\nInherited from PlaceCandidate: place_id, match_score (0..1, show it as round(score * 100) %),\ntags (3-4 short tags), distance_m (straight-line metres, None when the request has no origin).",
+        "properties": {
+          "avg_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "mean of our own reviews (sheet + web), 1..5; null when the place has no review",
+            "title": "Avg Rating"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "match_score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Match Score",
+            "type": "number"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "estimated VND per person (median of the reviews); null if unknown",
+            "title": "Price Per Person"
+          },
+          "reasons": {
+            "description": "up to 4 ready-to-show Vietnamese lines (mood, distance, price, rating); a line is omitted when its data is missing. distance_m is straight-line: show it with a '~' or 'khoảng'",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "review_count": {
+            "default": 0,
+            "description": "number of visible reviews behind avg_rating",
+            "title": "Review Count",
+            "type": "integer"
+          },
+          "tags": {
+            "description": "short system-generated tags",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "place_id",
+          "match_score"
+        ],
+        "title": "MatchResult",
+        "type": "object"
+      },
       "ParticipantOut": {
         "properties": {
           "display_name": {
@@ -316,6 +422,48 @@
         ],
         "title": "RegisterIn",
         "type": "object"
+      },
+      "RejectIn": {
+        "description": "'Không hợp': the client keeps the backup list, so the server stays stateless.",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/MatchCriteria"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RejectReason"
+          },
+          "rejected_place_id": {
+            "title": "Rejected Place Id",
+            "type": "string"
+          },
+          "remaining": {
+            "description": "place_ids of the backups still available (client-side list)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Remaining",
+            "type": "array"
+          }
+        },
+        "required": [
+          "criteria",
+          "reason",
+          "rejected_place_id",
+          "remaining"
+        ],
+        "title": "RejectIn",
+        "type": "object"
+      },
+      "RejectReason": {
+        "enum": [
+          "too_far",
+          "too_expensive",
+          "too_crowded",
+          "wrong_vibe"
+        ],
+        "title": "RejectReason",
+        "type": "string"
       },
       "RoomStateOut": {
         "properties": {
@@ -517,6 +665,25 @@
           "liked"
         ],
         "title": "VoteIn",
+        "type": "object"
+      },
+      "WhyOut": {
+        "description": "'Why this place?'. Separate endpoint because the LLM call is slow.",
+        "properties": {
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id",
+          "why"
+        ],
+        "title": "WhyOut",
         "type": "object"
       }
     }
@@ -1042,6 +1209,144 @@
         "summary": "Health",
         "tags": [
           "core"
+        ]
+      }
+    },
+    "/api/match": {
+      "post": {
+        "description": "One best place + up to 3 backups. With USE_STUB_MATCH=true it returns sample data.",
+        "operationId": "match_api_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchCriteria"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Match",
+        "tags": [
+          "M3 match"
+        ]
+      }
+    },
+    "/api/match/reject": {
+      "post": {
+        "description": "'Không hợp': rerank the remaining backups by the reason. (Task 7, not implemented yet.)",
+        "operationId": "reject_api_match_reject_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject",
+        "tags": [
+          "M3 match"
+        ]
+      }
+    },
+    "/api/match/{place_id}/why": {
+      "get": {
+        "description": "'Why this place?' written by Gemini. (Task 5, not implemented yet.)",
+        "operationId": "why_api_match__place_id__why_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "title": "Place Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mood",
+            "required": true,
+            "schema": {
+              "maxLength": 300,
+              "minLength": 1,
+              "title": "Mood",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Why",
+        "tags": [
+          "M3 match"
         ]
       }
     }
