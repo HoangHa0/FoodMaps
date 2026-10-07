@@ -99,7 +99,7 @@ def combine(components: dict[str, float | None]) -> float:
     total = sum(used.values())
     if total == 0:
         return 0.0
-    return clamp01(sum(components[name] * w for name, w in used.items()) / total)  
+    return clamp01(sum(components[name] * w for name, w in used.items()) / total)
 
 
 @dataclass(frozen=True)
@@ -181,19 +181,19 @@ MAX_REASONS = 3
 
 def build_reasons(s: Scored) -> list[str]:
     """Short Vietnamese lines shown on the card, displaying hard facts only.
-    
+
     A line is left out when its data is missing (no origin, no price, no review).
     Semantic score is omitted here because the UI already shows it as a "% MATCH" badge.
     """
     reasons: list[str] = []
-    
+
     if s.distance_m is not None:
         reasons.append(f"📍 Cách khoảng {format_distance(s.distance_m)}")
-        
+
     if s.price_per_person is not None:
         reasons.append(f"💰 ~ {format_vnd(s.price_per_person)}/người")
-        
+
     if s.avg_rating is not None and s.n_reviews > 0:
         reasons.append(f"⭐ {s.avg_rating:.1f} ({s.n_reviews} đánh giá)")
-        
+
     return reasons[:MAX_REASONS]
