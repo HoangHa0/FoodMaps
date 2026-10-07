@@ -22,7 +22,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 async def main() -> None:
-    from app.core.db import engine
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal, engine
+    from app.modules.match.models import Place
     from app.modules.match.service import MatchCandidateProvider
     from app.shared.contracts import GeoPoint, MatchCriteria
 
@@ -41,8 +44,24 @@ async def main() -> None:
         mood=a.mood, origin=origin, radius_m=a.radius, price_min=a.price_min, price_max=a.price_max
     )
     try:
-        for r in await MatchCandidateProvider().search(criteria, a.k):
-            print(f"{r.match_score:.3f}  {r.place_id}  {r.distance_m} m  {r.tags}  {r.reasons}")
+        results = await MatchCandidateProvider().search(criteria, a.k)
+        async with SessionLocal() as db:
+            rows = await db.execute(
+                select(Place.place_id, Place.manual_name).where(
+                    Place.place_id.in_([r.place_id for r in results])
+                )
+            )
+            names = {pid: name for pid, name in rows}
+
+        if not results:
+            print("(không có quán nào khớp)")
+        for i, r in enumerate(results, 1):
+            dist = "" if r.distance_m is None else f"  ~{r.distance_m} m"
+            print(f"{i}. {r.match_score:.3f}  {names.get(r.place_id, '?')}{dist}")
+            print(f"   tags: {', '.join(r.tags)}")
+            for line in r.reasons:
+                print(f"   {line}")
+            print(f"   id: {r.place_id}")
     finally:
         await engine.dispose()
 
