@@ -1,11 +1,16 @@
 """Try the Match pipeline against your real database and print the raw numbers.
 
-    cd backend
-    uv sync --extra ai
-    uv run python scripts/try_match.py "quán yên tĩnh để học bài"
-    uv run python scripts/try_match.py "đi date lãng mạn" --lat 21.0285 --lng 105.8522 --radius 3000 --max 200000
+cd backend
+uv sync --extra ai
 
-Look at the `cos` column to tune SIM_LOW / SIM_HIGH in app/modules/match/scoring.py.
+uv run python scripts/try_match.py "quán yên tĩnh để học bài"
+
+uv run python scripts/try_match.py "đi date lãng mạn" \
+    --lat 21.0285 --lng 105.8522 \
+    --radius 3000 --max 200000
+
+Look at the `cos` column to tune SIM_LOW / SIM_HIGH in
+app/modules/match/scoring.py.
 """
 
 import argparse
