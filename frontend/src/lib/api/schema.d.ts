@@ -252,7 +252,10 @@ export interface paths {
         put?: never;
         /**
          * Reject
-         * @description 'Không hợp': rerank the remaining backups by the reason. (Task 7, not implemented yet.)
+         * @description 'Not Match': reorder the backups the client still holds by the reason given.
+         *
+         *     The first place of the response is the new best; the rest are the new backups. The server keeps
+         *     no state: send the place_ids of the backups that are left in `remaining`.
          */
         post: operations["reject_api_match_reject_post"];
         delete?: never;

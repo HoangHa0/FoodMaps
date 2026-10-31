@@ -8,6 +8,10 @@ Pipeline (shared by AI Match, Group Session and Food Journey, only `k` differs):
        + our own review average, for every place that has an embedding from the current model
     3. in Python: exact distance, hard filters (radius, budget), Match Score, top k  (scoring.py)
     4. short tags for the winners only, taken from their reviews
+
+"Not Match" (`reject`) runs steps 1-3 again, but only over the backups the client still holds, and
+then reorders them by the reason the user gave (`scoring.rerank_after_reject`). The server keeps no
+state: the client sends the remaining place_ids.
 """
 
 import math
@@ -22,13 +26,17 @@ from app.core.db import SessionLocal
 from app.core.errors import AppError
 from app.modules.match.embedding import EMBED_MODEL, encode_queries
 from app.modules.match.models import Place, PlaceEmbedding
-from app.modules.match.schemas import MatchResponse, MatchResult
+from app.modules.match.schemas import MatchResponse, MatchResult, RejectIn
 from app.modules.match.scoring import (
     RawCandidate,
     Scored,
     build_reasons,
+    distance_score,
     haversine_m,
+    mean_crowd,
+    rerank_after_reject,
     score_candidates,
+    with_crowd,
 )
 from app.modules.match.text_builder import top_values
 from app.modules.reviews.models import Review
@@ -92,6 +100,37 @@ async def _tags_for(db: AsyncSession, scored: list[Scored]) -> dict[str, list[st
     return tags
 
 
+async def _crowd_for(db: AsyncSession, place_ids: list[str]) -> dict[str, float | None]:
+    """Average crowd (0 quiet .. 1 packed) per place from its visible reviews; None = nobody said."""
+    rows = await db.execute(
+        select(Review.place_id, Review.crowd_level).where(
+            Review.place_id.in_(place_ids),
+            Review.status == "visible",
+            Review.crowd_level.is_not(None),
+        )
+    )
+    levels: dict[str, list[str | None]] = defaultdict(list)
+    for row in rows:
+        levels[row.place_id].append(row.crowd_level)
+    return {pid: mean_crowd(levels[pid]) for pid in place_ids}
+
+
+def _to_results(scored: list[Scored], tags: dict[str, list[str]]) -> list[MatchResult]:
+    return [
+        MatchResult(
+            place_id=s.place_id,
+            match_score=round(s.score, 4),
+            tags=tags[s.place_id],
+            distance_m=s.distance_m,
+            price_per_person=s.price_per_person,
+            avg_rating=None if s.avg_rating is None else round(s.avg_rating, 1),
+            review_count=s.n_reviews,
+            reasons=build_reasons(s),
+        )
+        for s in scored
+    ]
+
+
 # --------------------------------------------------------------------------- pipeline
 
 
@@ -117,6 +156,38 @@ class MatchCandidateProvider:
             return await self._search(db, criteria, k)
 
     async def _search(self, db: AsyncSession, criteria: MatchCriteria, k: int) -> list[MatchResult]:
+        top = await self._scored(db, criteria, k)
+        return _to_results(top, await _tags_for(db, top))
+
+    async def rerank_after_reject(
+        self, criteria: MatchCriteria, reason: str, rejected_place_id: str, remaining: list[str]
+    ) -> list[MatchResult]:
+        """Re-score ONLY the backups the client still holds, then reorder them by the reason."""
+        _validate(criteria)
+        ids = list(dict.fromkeys(i for i in remaining if i != rejected_place_id))
+        if not ids:
+            return []
+        if self._db is not None:
+            return await self._rerank(self._db, criteria, reason, rejected_place_id, ids)
+        async with SessionLocal() as db:
+            return await self._rerank(db, criteria, reason, rejected_place_id, ids)
+
+    async def _rerank(
+        self, db: AsyncSession, criteria: MatchCriteria, reason: str, rejected_id: str, ids: list[str]
+    ) -> list[MatchResult]:
+        scored = await self._scored(db, criteria, len(ids), place_ids=ids)
+        scored = with_crowd(scored, await _crowd_for(db, ids))
+        ranked = rerank_after_reject(scored, reason, rejected_place_id=rejected_id)
+        return _to_results(ranked, await _tags_for(db, ranked))
+
+    async def _scored(
+        self,
+        db: AsyncSession,
+        criteria: MatchCriteria,
+        k: int,
+        place_ids: list[str] | None = None,
+    ) -> list[Scored]:
+        """Steps 1-3 of the pipeline. `place_ids` restricts the pool (used by "Không hợp")."""
         query_vec = await _encode_mood(criteria.mood)
 
         ratings = (
@@ -149,6 +220,8 @@ class MatchCandidateProvider:
             .order_by(distance)
             .limit(POOL_LIMIT)
         )
+        if place_ids is not None:
+            stmt = stmt.where(Place.place_id.in_(place_ids))
         if criteria.categories:
             stmt = stmt.where(func.lower(Place.category).in_([c.lower() for c in criteria.categories]))
         origin = criteria.origin
@@ -171,27 +244,13 @@ class MatchCandidateProvider:
             )
             for r in rows
         ]
-        top = score_candidates(
+        return score_candidates(
             pool,
             radius_m=criteria.radius_m,
             price_min=criteria.price_min,
             price_max=criteria.price_max,
             k=k,
         )
-        tags = await _tags_for(db, top)
-        return [
-            MatchResult(
-                place_id=s.place_id,
-                match_score=round(s.score, 4),
-                tags=tags[s.place_id],
-                distance_m=s.distance_m,
-                price_per_person=s.price_per_person,
-                avg_rating=None if s.avg_rating is None else round(s.avg_rating, 1),
-                review_count=s.n_reviews,
-                reasons=build_reasons(s),
-            )
-            for s in top
-        ]
 
 
 # --------------------------------------------------------------------------- endpoint logic
@@ -209,3 +268,45 @@ async def match(db: AsyncSession, criteria: MatchCriteria) -> MatchResponse:
         stub = await StubCandidateProvider().find_candidates(criteria, k)
         return split_best_and_backups([MatchResult(**c.model_dump()) for c in stub])
     return split_best_and_backups(await MatchCandidateProvider(db).search(criteria, k))
+
+
+async def reject(db: AsyncSession, data: RejectIn) -> MatchResponse:
+    """POST /api/match/reject: the user pressed "Not Match", so reorder the remaining backups.
+
+    The rejected place and anything the client no longer holds is never returned. The response has
+    the same shape as /api/match: the first place is the new best, the rest are the new backups.
+    """
+    criteria = data.criteria
+    if get_settings().use_stub_match:
+        _validate(criteria)
+        return split_best_and_backups(await _reject_stub(data))
+    provider = MatchCandidateProvider(db)
+    results = await provider.rerank_after_reject(
+        criteria, str(data.reason), data.rejected_place_id, data.remaining
+    )
+    return split_best_and_backups(results)
+
+
+async def _reject_stub(data: RejectIn) -> list[MatchResult]:
+    """Same reorder over the sample places, so the UI can be built before the AI pipeline exists."""
+    wanted = set(data.remaining) - {data.rejected_place_id}
+    stub = await StubCandidateProvider().find_candidates(data.criteria, 50)
+    scored = [
+        Scored(
+            place_id=c.place_id,
+            category="",
+            score=c.match_score,
+            distance_m=c.distance_m,
+            components={
+                "semantic": c.match_score,
+                "distance": (
+                    None if c.distance_m is None else distance_score(c.distance_m, data.criteria.radius_m)
+                ),
+            },
+        )
+        for c in stub
+        if c.place_id in wanted
+    ]
+    ranked = rerank_after_reject(scored, str(data.reason), rejected_place_id=data.rejected_place_id)
+    by_id = {c.place_id: c for c in stub}
+    return [MatchResult(**by_id[s.place_id].model_dump()) for s in ranked]

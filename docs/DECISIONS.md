@@ -183,7 +183,7 @@ the same input always gives the same output.
   `scripts/backfill_place_prices.py`), shown as one number ("Khoảng 40.000đ/người") so it matches
   what the filter compared. **Distance** is straight-line, so the text says "Cách khoảng".
 - **Results:** 1 best place + up to 3 backups (`BACKUP_COUNT`). The client keeps the backup list,
-  so the "Không hợp" reroll needs no server-side state.
+  so the "Not Match" reroll needs no server-side state.
 - **Only the current embedding model is matched** (`model_name = EMBED_MODEL`): vectors from
   different models are not comparable.
 - **No Google data is stored or returned.** The API returns `place_id`; name and photo come from
@@ -217,3 +217,81 @@ the rules below protect their quality without adding infrastructure.
 **Not done yet (next tasks).** Embeddings are recomputed offline (`scripts/compute_embeddings.py`),
 so a new website review changes search results only after the script is re-run. `pros` / `cons`
 of website reviews stay empty until an LLM job fills them (Review Analysis already reads them).
+
+## D12. "Not Match" (M3): reorder the remaining backups, no new search, no server state
+
+`POST /api/match/reject` receives the criteria, the reason, the rejected `place_id` and the
+`place_id`s of the backups the client still holds (`remaining`, at most 10). It answers in the same
+shape as `/api/match`: the first place is the new best, the others are the new backups. The server
+stores nothing, in line with D10 ("the client keeps the backup list").
+
+**How it works.** The backups are scored again with the normal pipeline (same query, same hard
+filters, restricted to `remaining`), then `scoring.rerank_after_reject` reorders them with a pure
+function:
+
+    key = (1 - 0.6) * original score + 0.6 * preference        (REJECT_PREFERENCE_WEIGHT)
+
+| Reason (button) | `preference` (0..1)                                                            | Missing data       |
+| --------------- | ------------------------------------------------------------------------------ | ------------------ |
+| `too_far`       | the `distance` component: closer is higher                                     | no origin: neutral |
+| `too_expensive` | relative cheapness inside the remaining backups (cheapest 1, dearest 0)        | unknown price: 0.5 |
+| `too_crowded`   | 1 - average crowd, from the reviews' crowd answers ("Vắng" 0 ... "Rất đông" 1) | nobody said: 0.5   |
+| `wrong_vibe`    | the `semantic` component (the best mood match first)                           | always present     |
+
+| Decision                                                                                                      | Why                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reorder inside the backups; never search again                                                                | The spec says "rerank trong top dự phòng". It is instant and cannot bring back a place the user has already seen                                                                                |
+| The card keeps the **original** `match_score`                                                                 | The mood did not change, so "% MATCH" must stay truthful; only the order changes. A backup shown first may therefore have a slightly lower % than the next one: that is the point of the reason |
+| Weight 0.6 for the preference                                                                                 | The complaint wins when two places are close, but a clearly better match is not dropped for a small gain. One constant to tune                                                                  |
+| Cheapness is relative to the other backups                                                                    | Only the order matters, and "cheaper than the others" is what the user means. An unknown price stays neutral because we cannot prove it is cheap                                                |
+| Crowd comes from review text, matched ignoring case and accents                                               | Reviews store it as free text. An answer we do not recognise counts as unknown, never as a guess. Crowd is only read on this path, so normal search is not slower                               |
+| Hard filters (radius, budget) still apply, and the rejected place is removed even if the client sends it back | Same rules as the first search; the answer can never contain what the user just rejected                                                                                                        |
+| With `USE_STUB_MATCH=true` the same reorder runs over the sample places                                       | The UI can be built before the AI pipeline is configured                                                                                                                                        |
+
+**Known limits.** The reorder uses only the places the client sends: with no backups left, the answer
+is `{"best": null, "backups": []}` and the UI should offer a new search. "Quá đông" is only as good
+as the crowd answers in the reviews; a place nobody described is treated as neutral.
+
+## D13. Place insights (M3/M4): one offline Groq call per place, nothing is generated at request time
+
+The team chose Groq.
+The LLM only runs in a script (`backend/scripts/generate_insights.py`) that a developer starts by hand;
+while users browse, the app only reads rows from PostgreSQL, so it costs no quota and cannot fail
+because of the LLM.
+
+**What one call returns, and where it is stored**
+
+| Output                                                    | Table / column                                 | Made by                                   |
+| --------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------- |
+| AI summary of the place                                   | `place_insights.summary`                       | LLM                                       |
+| Place-level pros / cons                                   | `place_insights.pros`, `cons`                  | LLM                                       |
+| Answers to the preset questions ("Có hợp đi date không?") | `place_insights.faq` (`{key: answer or null}`) | LLM                                       |
+| Highlight bullets, each with `support` and an embedding   | `place_highlights` (one row per bullet)        | LLM + sentence-transformers               |
+| Most mentioned dishes                                     | `place_insights.top_dishes`                    | plain code (same rule as Review Analysis) |
+
+The preset questions live in code (`insights.PRESET_QUESTIONS`), the answers in the database, so a
+button press never calls an LLM. `null` means "the reviews do not say": nothing is shown, nothing is guessed.
+Per-review pros/cons are **not** generated (nothing in the UI needs them, and they cost ~30 output tokens per review).
+
+**Highlights instead of a fixed tag list.** A fixed list ("study", "quiet", ...) cannot explain a search
+such as "có chỗ gửi xe máy". The LLM writes free bullets that really appear in the reviews, each with
+the number of reviews that mention it (`support`). At search time (a later task) the query is compared with
+the bullet embeddings; if nothing is close enough, no reason is invented and the place's strongest bullets
+plus the facts from the Match reasons are shown. They live in their own table (`place_highlights`) because
+each bullet has a `vector(384)` column, which pgvector can compare in SQL.
+
+| Decision                                                                                                                                                             | Why                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Only **website** reviews (`source = 'user'`) are sent to the LLM; a place with none gets no insight                                                                  | The team's internal form data is not public: it must not be summarised or quoted. `insights.LLM_REVIEW_SOURCES` is the one place to change this                                                                                                                                 |
+| `top_dishes` counts **all** visible reviews                                                                                                                          | It is a count made by code, identical to what `/api/reviews/analysis` already publishes, not text derived from private data. Change `top_dishes()` to filter by source if the team disagrees                                                                                    |
+| Model `openai/gpt-oss-20b` (`GROQ_MODEL`), fallback `openai/gpt-oss-120b`                                                                                            | ~10x cheaper output than Qwen3.6 27B on Groq; automatic prompt caching applies to the GPT-OSS family and our long system prompt is identical for every place. Same free-tier limits for both, so switching needs no code change (`--model`, then `--force`)                     |
+| Groq called with `httpx` (already a dependency), JSON mode, low reasoning effort                                                                                     | No new package, so no lock-file conflict; reasoning tokens are output tokens and the quota is small                                                                                                                                                                             |
+| Input cut to ~9,000 characters of review text per place, newest first                                                                                                | Free tier: ~8K tokens per minute for one request (input + output), 200K per day, so about 35-40 places per day                                                                                                                                                                  |
+| The client paces itself with a 60-second token window and reads `retry-after` on 429                                                                                 | A short wait is retried; a daily limit raises `GroqQuotaExhausted` and the run ends cleanly                                                                                                                                                                                     |
+| **Progress is stored in the database**: `place_insights.input_hash` = fingerprint of the place's website reviews (ids + `updated_at`) + prompt version + preset keys | A run stopped by the quota just continues the next day: finished places have an equal hash and are skipped. A new, edited or deleted review (or a prompt change) changes the hash, so exactly those places are redone. A place whose reviews were all deleted loses its insight |
+| Each place is committed on its own; a malformed answer is retried once, then the place is skipped                                                                    | One bad place never loses the others                                                                                                                                                                                                                                            |
+| Generated text goes through the review moderation filter and is length-limited; reviews are wrapped in tags and the prompt says to ignore instructions inside them   | Reviews are untrusted input; the stored text is shown to other users                                                                                                                                                                                                            |
+
+**Known limits.** Insights are refreshed by running the script, not automatically when a review is posted
+(the "recompute when a web review changes" task will mark places as stale). `faq` answers and highlights
+are only as good as the review count: with one review everything has `support = 1`.
