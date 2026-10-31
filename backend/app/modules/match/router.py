@@ -25,8 +25,12 @@ async def match(criteria: MatchCriteria, db: Db) -> MatchResponse:
 
 @router.post("/reject", response_model=MatchResponse)
 async def reject(data: RejectIn, db: Db) -> MatchResponse:
-    """'Không hợp': rerank the remaining backups by the reason. (Task 7, not implemented yet.)"""
-    raise todo()
+    """'Not Match': reorder the backups the client still holds by the reason given.
+
+    The first place of the response is the new best; the rest are the new backups. The server keeps
+    no state: send the place_ids of the backups that are left in `remaining`.
+    """
+    return await service.reject(db, data)
 
 
 @router.get("/{place_id}/why", response_model=WhyOut)

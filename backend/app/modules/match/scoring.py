@@ -10,13 +10,16 @@ Final score = weighted average of four components, each in 0..1:
 A component that does not apply (no origin, no budget) is dropped and the remaining weights are
 re-normalised, so a search without a location is not punished for it.
 
+The "Not Match" button reuses the same components (see `rerank_after_reject` at the bottom).
+
 All tunable numbers are constants at the top: adjust them after looking at real data
 (`scripts/try_match.py` prints the raw cosine values).
 """
 
 import math
+import unicodedata
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # --- weights (relative; they are re-normalised) -------------
 W_SEMANTIC = 0.55
@@ -36,6 +39,18 @@ RATING_PRIOR_WEIGHT = 3  # how many "virtual reviews" the prior counts for
 
 # --- budget -----------------------------------------------------------------------------------
 BUDGET_UNKNOWN_SCORE = 0.5  # the place has no price but the user gave a budget
+
+# --- "Not Match" rerank -----------------------------------------------------------------------
+# new key = (1 - REJECT_PREFERENCE_WEIGHT) * original score + REJECT_PREFERENCE_WEIGHT * preference.
+# 0 would ignore the complaint, 1 would ignore the original score. 0.6 lets the complaint win when
+# two places are close, but a clearly better match is not thrown away for a tiny gain.
+REJECT_PREFERENCE_WEIGHT = 0.6
+NEUTRAL_PREFERENCE = 0.5  # the data needed to judge the complaint is missing: neither good nor bad
+
+REASON_TOO_FAR = "too_far"
+REASON_TOO_EXPENSIVE = "too_expensive"
+REASON_TOO_CROWDED = "too_crowded"
+REASON_WRONG_VIBE = "wrong_vibe"
 
 EARTH_RADIUS_M = 6_371_000
 
@@ -113,6 +128,7 @@ class RawCandidate:
     distance_m: int | None  # None when the search has no origin
     avg_rating: float | None  # mean of the 4 review scores, None when there is no review
     n_reviews: int
+    crowd: float | None = None  # 0 (quiet) .. 1 (packed); only filled for the reject rerank
 
 
 @dataclass(frozen=True)
@@ -125,6 +141,7 @@ class Scored:
     price_per_person: int | None = None
     n_reviews: int = 0
     avg_rating: float | None = None  # raw mean of the review scores (1..5), NOT the shrunk one
+    crowd: float | None = None  # 0 (quiet) .. 1 (packed); None = nobody said
 
 
 def score_candidates(
@@ -158,6 +175,7 @@ def score_candidates(
                 price_per_person=r.price_per_person,
                 n_reviews=r.n_reviews,
                 avg_rating=r.avg_rating,
+                crowd=r.crowd,
             )
         )
     scored.sort(key=lambda s: (-s.score, s.place_id))  # place_id breaks ties: same input, same output
@@ -197,3 +215,95 @@ def build_reasons(s: Scored) -> list[str]:
         reasons.append(f"⭐ {s.avg_rating:.1f} ({s.n_reviews} đánh giá)")
 
     return reasons[:MAX_REASONS]
+
+
+# --------------------------------------------------------------------------- "Not Match" rerank
+
+
+def crowd_level_to_number(text: str | None) -> float | None:
+    """Turn a review's free-text crowd answer into 0 (quiet) .. 1 (packed).
+
+    Reviews store the answer as text ("Vắng", "Vừa phải", "Đông", ...), so the words are matched
+    ignoring case and accents. An answer we do not recognise gives None (unknown), never a guess.
+    """
+    if not text:
+        return None
+    folded = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
+    t = " ".join("".join(c for c in folded if not unicodedata.combining(c)).casefold().split())
+    if not t:
+        return None
+    if any(w in t for w in ("vang", "khong dong", "it nguoi", "thoang", "yen tinh")):
+        return 0.0
+    if any(w in t for w in ("rat dong", "qua dong", "kin cho", "phai cho", "dong nghit")):
+        return 1.0
+    if any(w in t for w in ("vua", "binh thuong", "trung binh")):
+        return 0.5
+    if "dong" in t:
+        return 0.8
+    return None
+
+
+def mean_crowd(levels: Sequence[str | None]) -> float | None:
+    """Average crowd of a place over the reviews that said something recognisable."""
+    numbers = [n for level in levels if (n := crowd_level_to_number(level)) is not None]
+    return sum(numbers) / len(numbers) if numbers else None
+
+
+def _cheapness(candidates: Sequence[Scored]) -> dict[str, float]:
+    """1 for the cheapest place of the group, 0 for the dearest, relative to the group itself.
+
+    Only the order matters here (nothing is shown as a percentage), so a relative scale is fine.
+    A place with an unknown price, or a group where every price is equal, stays neutral.
+    """
+    prices = [c.price_per_person for c in candidates if c.price_per_person is not None]
+    low, high = (min(prices), max(prices)) if prices else (0, 0)
+    out: dict[str, float] = {}
+    for c in candidates:
+        if c.price_per_person is None or high == low:
+            out[c.place_id] = NEUTRAL_PREFERENCE
+        else:
+            out[c.place_id] = (high - c.price_per_person) / (high - low)
+    return out
+
+
+def rerank_after_reject(
+    candidates: Sequence[Scored],
+    reason: str,
+    *,
+    rejected_place_id: str | None = None,
+) -> list[Scored]:
+    """Reorder the remaining backups after the user pressed "Not Match" (pure, deterministic).
+
+    The rejected place is removed. Every other place keeps its original `score`, which is still
+    what the card shows as "% MATCH" (the mood did not change); only the ORDER changes:
+
+        too_far        prefer the closer place        (distance component; neutral without origin)
+        too_expensive  prefer the cheaper place       (relative to the other backups)
+        too_crowded    prefer the quieter place       (from the reviews' crowd answers)
+        wrong_vibe     prefer the better mood match   (semantic component)
+
+    An unknown reason keeps the original order. Ties are broken by `place_id`.
+    """
+    pool = [c for c in candidates if c.place_id != rejected_place_id]
+    cheap = _cheapness(pool) if reason == REASON_TOO_EXPENSIVE else {}
+
+    def preference(c: Scored) -> float:
+        if reason == REASON_TOO_FAR:
+            value = c.components.get("distance")
+        elif reason == REASON_TOO_EXPENSIVE:
+            value = cheap[c.place_id]
+        elif reason == REASON_TOO_CROWDED:
+            value = None if c.crowd is None else 1.0 - c.crowd
+        elif reason == REASON_WRONG_VIBE:
+            value = c.components.get("semantic")
+        else:
+            return NEUTRAL_PREFERENCE
+        return NEUTRAL_PREFERENCE if value is None else clamp01(value)
+
+    w = REJECT_PREFERENCE_WEIGHT
+    return sorted(pool, key=lambda c: (-((1 - w) * c.score + w * preference(c)), c.place_id))
+
+
+def with_crowd(candidates: Sequence[Scored], crowd_by_place: dict[str, float | None]) -> list[Scored]:
+    """Attach the crowd number to already-scored places (it is only needed for the reject rerank)."""
+    return [replace(c, crowd=crowd_by_place.get(c.place_id)) for c in candidates]
