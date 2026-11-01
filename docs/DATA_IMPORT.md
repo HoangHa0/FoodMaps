@@ -212,3 +212,24 @@ For reviews, price backfilling, and embeddings, always run the `--dry-run` versi
 - For reviews, only records with `source = 'sheet'` are replaced during a Google Form refresh.
 - User-submitted reviews (`source = 'user'`) must not be deleted during the sheet import process.
 - If any import script reports errors during `--dry-run`, fix the source data or script before running the real import.
+
+## 5. Generate AI insights (pros/cons, FAQ, highlights, summary)
+
+Run this after reviews changed. It calls Groq, so it needs a key and uses a daily quota. Two calls per place
+(`docs/DECISIONS.md` D13): the main call reads **all** reviews (pros/cons, FAQ, highlights for "Why this place");
+the summary call reads **website reviews only**, because the internal sheet data is not public. Full guide in
+the docstring of `backend/scripts/generate_insights.py`.
+
+```bash
+cd backend
+uv sync --extra ai                                          # once: embedding model for the highlights
+# put GROQ_API_KEY=... in backend/.env
+uv run python scripts/generate_insights.py --dry-run        # plan only: nothing is sent or written
+uv run python scripts/generate_insights.py --place Q001     # try ONE place, read the result
+uv run python scripts/generate_insights.py                  # everything new or changed
+```
+
+A place that already has insights is redone only when it got at least 3 new/edited reviews (`--min-changes 3`) or its insight is 14 days old (`--stale-days 14`); the `--dry-run` line shows how many places are "hoãn" (deferred). To remove a hidden review from an insight right away: `uv run python scripts/generate_insights.py --place Q001 --force`.
+
+If the daily quota runs out the script stops by itself; finished places are saved. Run it again the next
+day: calls that are already up to date are skipped automatically. After changing `GROQ_MODEL`, add `--force`.
