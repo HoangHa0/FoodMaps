@@ -374,3 +374,9 @@ def test_plan_status():
 
 def test_only_new_stale_and_forced_places_cost_a_groq_call():
     assert set(ins.TODO_STATUSES) == {ins.STATUS_NEW, ins.STATUS_STALE, ins.STATUS_FORCED}
+
+
+def test_the_main_prompt_asks_for_natural_phrases_and_reasoned_answers():
+    system, _ = ins.build_messages("A", "cafe", "x", 1)
+    assert "complete phrase" in system and "bare score" in system
+    assert "Never answer with a single word" in system
