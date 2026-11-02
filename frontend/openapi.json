@@ -150,6 +150,51 @@
         "title": "CreateRoomIn",
         "type": "object"
       },
+      "DishCount": {
+        "properties": {
+          "mentions": {
+            "description": "number of reviews that recommend the dish",
+            "title": "Mentions",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "mentions"
+        ],
+        "title": "DishCount",
+        "type": "object"
+      },
+      "FaqItem": {
+        "properties": {
+          "answer": {
+            "description": "the answer written from the reviews, ready to show",
+            "title": "Answer",
+            "type": "string"
+          },
+          "key": {
+            "description": "preset key, e.g. 'date', 'study', 'budget'",
+            "title": "Key",
+            "type": "string"
+          },
+          "question": {
+            "description": "the preset question, ready to show: 'Có hợp đi date không?'",
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "question",
+          "answer"
+        ],
+        "title": "FaqItem",
+        "type": "object"
+      },
       "GeoPoint": {
         "properties": {
           "lat": {
@@ -183,6 +228,76 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InsightsOut": {
+        "description": "What the offline job (`scripts/generate_insights.py`) wrote about one place: ready to show,\nread from the database, no LLM runs when this is requested.",
+        "properties": {
+          "cons": {
+            "description": "up to 5 short points reviewers complain about; empty if none",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cons",
+            "type": "array"
+          },
+          "faq": {
+            "description": "only the preset questions the reviews can answer, always in the same order; an unanswered question is left out, never answered with a guess",
+            "items": {
+              "$ref": "#/components/schemas/FaqItem"
+            },
+            "title": "Faq",
+            "type": "array"
+          },
+          "generated_at": {
+            "description": "when the insights were last generated",
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "pros": {
+            "description": "up to 5 short points that reviewers praise",
+            "items": {
+              "type": "string"
+            },
+            "title": "Pros",
+            "type": "array"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "AI summary written from website reviews only; null while the place has none",
+            "title": "Summary"
+          },
+          "top_dishes": {
+            "description": "most mentioned dishes, most mentioned first",
+            "items": {
+              "$ref": "#/components/schemas/DishCount"
+            },
+            "title": "Top Dishes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "place_id",
+          "summary",
+          "pros",
+          "cons",
+          "faq",
+          "top_dishes",
+          "generated_at"
+        ],
+        "title": "InsightsOut",
         "type": "object"
       },
       "JoinRoomIn": {
@@ -1261,7 +1376,7 @@
         "type": "object"
       },
       "WhyOut": {
-        "description": "'Why this place?'. Bullets written offline from the reviews and picked by similarity to the\nsearch text: no LLM runs here, so the answer is instant.\n\nShow `points` as a list (a \"Phù hợp với bạn\" label may be used for `matched` ones) and put the\n`reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the\nplace has no insights yet: show the Match `reasons` only.",
+        "description": "'Why this place?'. Bullets written offline from the reviews and picked by similarity to the\nsearch text: no LLM runs here, so the answer is instant.\n\nShow `points` as a list (a \"Khớp với bạn\" label may be used for `matched` ones) and put the\n`reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the\nplace has no insights yet: show the Match `reasons` only.",
         "properties": {
           "place_id": {
             "title": "Place Id",
@@ -1913,6 +2028,49 @@
           }
         },
         "summary": "Reject",
+        "tags": [
+          "M3 match"
+        ]
+      }
+    },
+    "/api/match/{place_id}/insights": {
+      "get": {
+        "description": "AI Summary, pros/cons, answers to the preset questions and most mentioned dishes of one place.\n\nWritten offline by `scripts/generate_insights.py` and only read here. 404 `insights_not_found`\n= the place exists but has no insights yet (hide the block); 404 `not_found` = unknown place.",
+        "operationId": "insights_api_match__place_id__insights_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Insights",
         "tags": [
           "M3 match"
         ]
