@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.modules.match import service
-from app.modules.match.schemas import MatchResponse, RejectIn, WhyOut
+from app.modules.match.schemas import InsightsOut, MatchResponse, RejectIn, WhyOut
 from app.shared.contracts import MatchCriteria
 
 router = APIRouter(prefix="/match", tags=["M3 match"])
@@ -40,3 +40,13 @@ async def why(place_id: str, mood: Annotated[str, Query(min_length=1, max_length
     embedding similarity to `mood`, so no LLM is called. Empty `points` = the place has no insights yet.
     """
     return await service.why(db, place_id, mood)
+
+
+@router.get("/{place_id}/insights", response_model=InsightsOut)
+async def insights(place_id: str, db: Db) -> InsightsOut:
+    """AI Summary, pros/cons, answers to the preset questions and most mentioned dishes of one place.
+
+    Written offline by `scripts/generate_insights.py` and only read here. 404 `insights_not_found`
+    = the place exists but has no insights yet (hide the block); 404 `not_found` = unknown place.
+    """
+    return await service.insights(db, place_id)
