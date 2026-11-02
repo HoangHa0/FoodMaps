@@ -395,3 +395,16 @@ def test_generated_points_start_with_a_capital_letter():
     assert result.pros == ["Đồ ăn ngon", "Giá rẻ"] and result.cons == ["Đắt"]
     assert result.faq["date"] == "Có, không gian yên tĩnh."
     assert result.highlights[0].text == "Đồ uống đậm vị"
+
+
+def test_highlights_are_reasons_to_go_written_as_complete_sentences():
+    system, _ = ins.build_messages("A", "cafe", "x", 1)
+    assert "REASONS TO GO" in system
+    assert "never a complaint or a weakness" in system
+    assert "complete, friendly Vietnamese sentence" in system
+
+
+def test_the_main_prompt_keeps_a_point_only_when_most_reviews_agree():
+    system, _ = ins.build_messages("A", "cafe", "x", 1)
+    assert "MORE reviews say it than contradict it" in system
+    assert "Có ý kiến cho rằng" in system
