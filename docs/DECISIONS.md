@@ -284,7 +284,7 @@ Per-review pros/cons are **not** generated (nothing in the UI needs them).
 
 **Highlights instead of a fixed tag list.** A fixed list ("study", "quiet", ...) cannot explain a search such
 as "có chỗ gửi xe máy". The LLM writes free bullets that really appear in the reviews, each with the number of
-reviews that mention it (`support`). At search time (a later task) the query is compared with the bullet
+reviews that mention it (`support`). At search time (D14) the query is compared with the bullet
 embeddings; if nothing is close enough, no reason is invented and the place's strongest bullets plus the facts
 from the Match reasons are shown. They live in their own table because each bullet has a vector column that
 pgvector can compare in SQL.
@@ -303,3 +303,42 @@ pgvector can compare in SQL.
 **Known limits.** Insights are refreshed by running the script, not automatically when a review is posted
 (the "recompute when a web review changes" task will mark places as stale). The pros/cons, FAQ and highlights
 are only as good as the review count: with one review everything has `support = 1`.
+
+## D14. "Why this place?" (M3): pick the stored bullets by embedding similarity, no LLM at request time
+
+`GET /api/match/{place_id}/why?mood=...` answers with 3-4 short Vietnamese bullets such as "Không gian rộng rãi"
+or "Có nhiều ổ điện". The bullets are the `place_highlights` that the insights job (D13) already wrote from the
+reviews; at request time the service only **chooses** among them, so the answer is instant, costs no Groq quota
+and cannot fail because of the LLM.
+
+**How it works** (`modules/match/why.py` is pure and unit-tested; `service.why` does the query)
+
+1. Encode the search text with the same model as the place search (`encode_queries`).
+2. One SQL query: the cosine similarity between that vector and every highlight of **one** place
+   (pgvector), only for vectors made by the current embedding model.
+3. Bullets with similarity >= `WHY_MIN_SIMILARITY` are shown first, best match first, flagged `matched = true`.
+4. Fewer than 3 matched? The place's strongest bullets (most reviews mention them) fill the list, flagged
+   `matched = false`: they are real facts about the place, only not tied to the search.
+5. The client shows the bullets and, next to them, the `reasons` of the Match result (distance, price, rating),
+   which are computed from numbers and need no LLM either.
+
+| Decision                                                                                                       | Why                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No LLM call at request time; the wording is fixed when the insights job runs                                   | A request would cost quota and ~1 s of latency, and the free tier would limit the number of searches. The prompt in `insights.py` asks for natural, complete phrases ("Đồ uống được nhiều người nhận xét là khá đắt"), so the stored bullets can be shown as they are                                                                                                                                                |
+| Highlights are reasons to go: positive or neutral facts written as complete sentences; complaints go to `cons` | The bullets are shown as "why this place". A bullet such as "Vệ sinh kém" is close to a search for "quán sạch sẽ" and would be shown as a reason, and a bare fragment ("Giá tăng", "Rau cho ít") reads badly. The prompt in `insights.py` asks for full sentences and bans complaints, so places made with an older prompt must be regenerated before this endpoint is used (`generate_insights.py --min-changes 0`) |
+| Highlights are free bullets compared by embedding, not a fixed tag list                                        | It explains any search that appears in the reviews ("có chỗ gửi xe máy"), not only the tags we thought of                                                                                                                                                                                                                                                                                                            |
+| A bullet counts as matched only above a similarity threshold (`WHY_MIN_SIMILARITY = 0.40`)                     | A search about parking must not be "explained" by a bullet about coffee. Below the threshold the strongest bullets are shown **without** the matched flag, so the UI never claims a match that does not exist                                                                                                                                                                                                        |
+| A place without insights returns `points: []` (200), an unknown `place_id` returns 404                         | The UI falls back to the Match `reasons`; nothing is invented                                                                                                                                                                                                                                                                                                                                                        |
+| Response keeps `why` (the bullets joined by "; ") and adds `points`                                            | Adding a field does not break clients written against the old contract; the list is what the UI should use                                                                                                                                                                                                                                                                                                           |
+| Only bullets whose `embedding_model` equals the current `EMBED_MODEL` are compared                             | A query vector only matches vectors of its own model (same rule as the place search)                                                                                                                                                                                                                                                                                                                                 |
+| `USE_STUB_MATCH=true` returns sample bullets                                                                   | The UI can be built before the AI pipeline is configured                                                                                                                                                                                                                                                                                                                                                             |
+
+**Known limits.**
+
+- The threshold is a first estimate. Calibrate it on real searches with `scripts/try_why.py <place_code> "<text>"`,
+  which prints every bullet with its similarity and marks the ones the API would show, then change the constant.
+- The endpoint encodes the search text, so it needs the `ai` extra and RAM like `/api/match` (D7). The client
+  should call it for the place the user is looking at, not for every backup.
+- If a bullet reads badly, fix the prompt in `insights.py` and regenerate the place; it cannot be reworded at
+  request time.
+- The embedding model matches wording, not inference: a search for ‘học bài’ does not match a bullet about outlets and wifi (cosine about 0.08).
