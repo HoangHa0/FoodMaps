@@ -4,6 +4,7 @@ The frontend types are generated from these models (`make api-types`), so a chan
 contract change that Person C sees.
 """
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -71,7 +72,7 @@ class WhyOut(BaseModel):
     """'Why this place?'. Bullets written offline from the reviews and picked by similarity to the
     search text: no LLM runs here, so the answer is instant.
 
-    Show `points` as a list (a "Phù hợp với bạn" label may be used for `matched` ones) and put the
+    Show `points` as a list (a "Khớp với bạn" label may be used for `matched` ones) and put the
     `reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the
     place has no insights yet: show the Match `reasons` only.
     """
@@ -79,3 +80,32 @@ class WhyOut(BaseModel):
     place_id: str
     why: str = Field(description="the `points` joined into one line; empty when there are none")
     points: list[WhyPoint] = Field(default_factory=list, description="3-4 bullets, matched ones first")
+
+
+class FaqItem(BaseModel):
+    key: str = Field(description="preset key, e.g. 'date', 'study', 'budget'")
+    question: str = Field(description="the preset question, ready to show: 'Có hợp đi date không?'")
+    answer: str = Field(description="the answer written from the reviews, ready to show")
+
+
+class DishCount(BaseModel):
+    name: str
+    mentions: int = Field(description="number of reviews that recommend the dish")
+
+
+class InsightsOut(BaseModel):
+    """What the offline job (`scripts/generate_insights.py`) wrote about one place: ready to show,
+    read from the database, no LLM runs when this is requested."""
+
+    place_id: str
+    summary: str | None = Field(
+        description="AI summary written from website reviews only; null while the place has none"
+    )
+    pros: list[str] = Field(description="up to 5 short points that reviewers praise")
+    cons: list[str] = Field(description="up to 5 short points reviewers complain about; empty if none")
+    faq: list[FaqItem] = Field(
+        description="only the preset questions the reviews can answer, always in the same order; "
+        "an unanswered question is left out, never answered with a guess"
+    )
+    top_dishes: list[DishCount] = Field(description="most mentioned dishes, most mentioned first")
+    generated_at: datetime = Field(description="when the insights were last generated")

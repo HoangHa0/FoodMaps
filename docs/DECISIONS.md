@@ -342,3 +342,28 @@ and cannot fail because of the LLM.
 - If a bullet reads badly, fix the prompt in `insights.py` and regenerate the place; it cannot be reworded at
   request time.
 - The embedding model matches wording, not inference: a search for ‘học bài’ does not match a bullet about outlets and wifi (cosine about 0.08).
+
+## D15. Place insights endpoint (M3/M4): the stored row is the answer, one request per place page
+
+`GET /api/match/{place_id}/insights` returns what the offline job (D13) wrote about one place, ready to show:
+the AI summary, pros/cons, the answers to the preset questions and the most mentioned dishes. It only reads
+`place_insights`, so a button press ("Có hợp đi date không?") never calls an LLM and the answers are cached by
+design: they are generated once and stored.
+
+| Decision                                                                                                    | Why                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Under `/api/match/{place_id}/...`, next to `/why`                                                           | The tables belong to the match module (D13) and both endpoints answer a question about one place; guests can call it, like the rest of `/api/match`                                                       |
+| `faq` is a list of `{key, question, answer}` in a fixed order, and a question without an answer is left out | The UI needs no copy of the preset questions, and a question the reviews cannot answer is hidden instead of answered with a guess (`null` in the database, D13)                                           |
+| `summary` is `null` while the place has no website review                                                   | The summary is written from website reviews only because the sheet data is not public (D13); pros/cons, the answers and the highlights use every review. The UI hides the summary block when it is `null` |
+| Place exists but has no row: 404 `insights_not_found`; unknown `place_id`: 404 `not_found`                  | The UI can hide the block for the first and treat the second as a bug. Places only get a row after the job has run                                                                                        |
+| `generated_at` is returned                                                                                  | The data is only as fresh as the last run of the job (it is not refreshed when a review is posted), so the UI may show the date                                                                           |
+| `USE_STUB_MATCH=true` returns sample data                                                                   | The UI can be built before the AI pipeline is configured                                                                                                                                                  |
+
+**How it relates to Review Analysis (D11).** `GET /api/reviews/analysis/{place_id}` is plain code over the
+visible reviews and is always up to date (aspect scores, tags, crowd, price). This endpoint is generated text
+and may be older. The two both list popular dishes: the numbers can differ until the job runs again, so the UI
+should take dishes from one of them for a given screen, not both.
+
+**Known limits.** Insights appear only after `scripts/generate_insights.py` has run for the place (and, with the
+refresh policy of D13, may wait up to 14 days for a few new reviews). A hidden review is removed from the text
+at the next regeneration, or at once with `--place Qxxx --force`.

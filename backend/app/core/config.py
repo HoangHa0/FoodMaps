@@ -38,9 +38,9 @@ class Settings(BaseSettings):
 
     # --- M3/M4: offline LLM job (scripts/generate_insights.py). Never called while users browse. ---
     groq_api_key: str = ""
-    # openai/gpt-oss-20b: cheapest, with prompt caching. Fallback if its Vietnamese is not good
-    # enough: openai/gpt-oss-120b (same limits). See DECISIONS D13.
-    groq_model: str = "openai/gpt-oss-20b"
+    # openai/gpt-oss-120b: wrote more specific, natural Vietnamese than 20b on the same places
+    # (same limits). Fallback: openai/gpt-oss-20b. See DECISIONS D13.
+    groq_model: str = "openai/gpt-oss-120b"
 
     cors_origins: list[str] = ["http://localhost:3000"]
 

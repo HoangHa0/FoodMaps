@@ -9,6 +9,9 @@ Pipeline (shared by AI Match, Group Session and Food Journey, only `k` differs):
     3. in Python: exact distance, hard filters (radius, budget), Match Score, top k  (scoring.py)
     4. short tags for the winners only, taken from their reviews
 
+"Insights" (`insights`) reads the row the offline job wrote for one place: summary, pros/cons, answers to
+the preset questions, top dishes. It only reads the database.
+
 "Why this place" (`why`) encodes the mood once more and compares it with the stored highlight bullets
 of ONE place (`why.py`); no LLM is called.
 
@@ -19,6 +22,7 @@ state: the client sends the remaining place_ids.
 
 import math
 from collections import defaultdict
+from datetime import UTC, datetime
 
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
@@ -28,8 +32,18 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.errors import AppError, not_found
 from app.modules.match.embedding import EMBED_MODEL, encode_queries
+from app.modules.match.insights import PRESET_QUESTIONS
 from app.modules.match.models import Place, PlaceEmbedding, PlaceHighlight, PlaceInsight
-from app.modules.match.schemas import MatchResponse, MatchResult, RejectIn, WhyOut, WhyPoint
+from app.modules.match.schemas import (
+    DishCount,
+    FaqItem,
+    InsightsOut,
+    MatchResponse,
+    MatchResult,
+    RejectIn,
+    WhyOut,
+    WhyPoint,
+)
 from app.modules.match.scoring import (
     RawCandidate,
     Scored,
@@ -364,3 +378,59 @@ _STUB_WHY = [
         ("Giá đồ uống hơi cao", False),
     )
 ]
+
+
+# --------------------------------------------------------------------------- insights of a place
+
+
+def _faq_items(faq: dict[str, str | None]) -> list[FaqItem]:
+    """The answered preset questions, in the order of `PRESET_QUESTIONS`; `null` answers are left out."""
+    return [
+        FaqItem(key=key, question=question, answer=faq[key])
+        for key, question in PRESET_QUESTIONS
+        if faq.get(key)
+    ]
+
+
+async def insights(db: AsyncSession, place_id: str) -> InsightsOut:
+    """GET /api/match/{place_id}/insights: the stored insights of one place (no LLM).
+
+    With USE_STUB_MATCH=true it returns sample data so the UI can be built first.
+    """
+    if get_settings().use_stub_match:
+        return _stub_insights(place_id)
+    row = await db.get(PlaceInsight, place_id)
+    if row is None:
+        if await db.scalar(select(Place.place_id).where(Place.place_id == place_id)) is None:
+            raise not_found("Quán")
+        raise AppError(404, "insights_not_found", "Quán này chưa có phân tích AI")
+    return InsightsOut(
+        place_id=place_id,
+        summary=row.summary,
+        pros=list(row.pros),
+        cons=list(row.cons),
+        faq=_faq_items(row.faq),
+        top_dishes=[DishCount(name=d["name"], mentions=int(d["mentions"])) for d in row.top_dishes],
+        generated_at=row.generated_at,
+    )
+
+
+def _stub_insights(place_id: str) -> InsightsOut:
+    return InsightsOut(
+        place_id=place_id,
+        summary="Quán rộng rãi, yên tĩnh, được nhiều bạn sinh viên chọn để học bài; đồ uống hơi đắt.",
+        pros=["Không gian rộng rãi và thoải mái", "Có nhiều ổ điện và wifi", "Quán mở cửa đến nửa đêm"],
+        cons=["Giá đồ uống hơi cao", "Quán thường đông vào mùa thi"],
+        faq=[
+            FaqItem(
+                key="study",
+                question="Có hợp học bài / làm việc không?",
+                answer="Có, nhiều ổ điện và yên tĩnh.",
+            ),
+            FaqItem(
+                key="budget", question="Giá có hợp với sinh viên không?", answer="Tuỳ, giá đồ uống hơi cao."
+            ),
+        ],
+        top_dishes=[DishCount(name="Matcha Latte", mentions=2), DishCount(name="Cà phê muối", mentions=1)],
+        generated_at=datetime(2026, 11, 1, 12, 0, tzinfo=UTC),
+    )

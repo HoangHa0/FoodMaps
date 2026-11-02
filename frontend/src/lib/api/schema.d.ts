@@ -264,6 +264,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match/{place_id}/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insights
+         * @description AI Summary, pros/cons, answers to the preset questions and most mentioned dishes of one place.
+         *
+         *     Written offline by `scripts/generate_insights.py` and only read here. 404 `insights_not_found`
+         *     = the place exists but has no insights yet (hide the block); 404 `not_found` = unknown place.
+         */
+        get: operations["insights_api_match__place_id__insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match/{place_id}/why": {
         parameters: {
             query?: never;
@@ -459,6 +482,34 @@ export interface components {
              */
             display_name: string;
         };
+        /** DishCount */
+        DishCount: {
+            /**
+             * Mentions
+             * @description number of reviews that recommend the dish
+             */
+            mentions: number;
+            /** Name */
+            name: string;
+        };
+        /** FaqItem */
+        FaqItem: {
+            /**
+             * Answer
+             * @description the answer written from the reviews, ready to show
+             */
+            answer: string;
+            /**
+             * Key
+             * @description preset key, e.g. 'date', 'study', 'budget'
+             */
+            key: string;
+            /**
+             * Question
+             * @description the preset question, ready to show: 'Có hợp đi date không?'
+             */
+            question: string;
+        };
         /** GeoPoint */
         GeoPoint: {
             /** Lat */
@@ -470,6 +521,46 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InsightsOut
+         * @description What the offline job (`scripts/generate_insights.py`) wrote about one place: ready to show,
+         *     read from the database, no LLM runs when this is requested.
+         */
+        InsightsOut: {
+            /**
+             * Cons
+             * @description up to 5 short points reviewers complain about; empty if none
+             */
+            cons: string[];
+            /**
+             * Faq
+             * @description only the preset questions the reviews can answer, always in the same order; an unanswered question is left out, never answered with a guess
+             */
+            faq: components["schemas"]["FaqItem"][];
+            /**
+             * Generated At
+             * Format: date-time
+             * @description when the insights were last generated
+             */
+            generated_at: string;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Pros
+             * @description up to 5 short points that reviewers praise
+             */
+            pros: string[];
+            /**
+             * Summary
+             * @description AI summary written from website reviews only; null while the place has none
+             */
+            summary: string | null;
+            /**
+             * Top Dishes
+             * @description most mentioned dishes, most mentioned first
+             */
+            top_dishes: components["schemas"]["DishCount"][];
         };
         /** JoinRoomIn */
         JoinRoomIn: {
@@ -953,7 +1044,7 @@ export interface components {
          * @description 'Why this place?'. Bullets written offline from the reviews and picked by similarity to the
          *     search text: no LLM runs here, so the answer is instant.
          *
-         *     Show `points` as a list (a "Phù hợp với bạn" label may be used for `matched` ones) and put the
+         *     Show `points` as a list (a "Khớp với bạn" label may be used for `matched` ones) and put the
          *     `reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the
          *     place has no insights yet: show the Match `reasons` only.
          */
@@ -1471,6 +1562,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insights_api_match__place_id__insights_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                place_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightsOut"];
                 };
             };
             /** @description Validation Error */
