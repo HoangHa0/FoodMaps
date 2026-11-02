@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.errors import todo
 from app.modules.match import service
 from app.modules.match.schemas import MatchResponse, RejectIn, WhyOut
 from app.shared.contracts import MatchCriteria
@@ -34,6 +33,10 @@ async def reject(data: RejectIn, db: Db) -> MatchResponse:
 
 
 @router.get("/{place_id}/why", response_model=WhyOut)
-async def why(place_id: str, mood: Annotated[str, Query(min_length=1, max_length=300)]) -> WhyOut:
-    """'Why this place?' written by Gemini. (Task 5, not implemented yet.)"""
-    raise todo()
+async def why(place_id: str, mood: Annotated[str, Query(min_length=1, max_length=300)], db: Db) -> WhyOut:
+    """'Why this place?': 3-4 short bullets from the reviews that fit what the user typed.
+
+    The bullets are written offline by `scripts/generate_insights.py`; here they are only chosen by
+    embedding similarity to `mood`, so no LLM is called. Empty `points` = the place has no insights yet.
+    """
+    return await service.why(db, place_id, mood)
