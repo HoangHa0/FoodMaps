@@ -82,7 +82,3 @@ async def test_reject_validates_the_input(client):
     bad_budget = _reject_body(price_min=200_000, price_max=100_000)
     r = await client.post("/api/match/reject", json=bad_budget)
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_budget"
-
-
-async def test_why_is_not_implemented_yet(client):
-    assert (await client.get("/api/match/abc/why", params={"mood": "x"})).status_code == 501
