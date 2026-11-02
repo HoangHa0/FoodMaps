@@ -319,7 +319,7 @@ The defaults work for local development; API keys are only needed by the feature
 |                       | `GOOGLE_MAPS_API_KEY`                                          | Google Places API (server side)                                                  |
 |                       | `GEMINI_API_KEY`                                               | Gemini API for review analysis                                                   |
 |                       | `GROQ_API_KEY`                                                 | Groq API for the offline insights job (`scripts/generate_insights.py`)           |
-|                       | `GROQ_MODEL`                                                   | Model of that job (default `openai/gpt-oss-20b`; fallback `openai/gpt-oss-120b`) |
+|                       | `GROQ_MODEL`                                                   | Model of that job (default `openai/gpt-oss-120b`; fallback `openai/gpt-oss-20b`) |
 |                       | `USE_STUB_MATCH`                                               | `true` = sample recommendations while the AI pipeline is not configured          |
 | `frontend/.env.local` | `BACKEND_URL`                                                  | Where the frontend forwards`/api/*` requests (default `http://localhost:8000`)   |
 |                       | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAP_ID` | Google Maps JavaScript API (browser side)                                        |

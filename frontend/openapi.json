@@ -1261,13 +1261,22 @@
         "type": "object"
       },
       "WhyOut": {
-        "description": "'Why this place?'. Separate endpoint because the LLM call is slow.",
+        "description": "'Why this place?'. Bullets written offline from the reviews and picked by similarity to the\nsearch text: no LLM runs here, so the answer is instant.\n\nShow `points` as a list (a \"Phù hợp với bạn\" label may be used for `matched` ones) and put the\n`reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the\nplace has no insights yet: show the Match `reasons` only.",
         "properties": {
           "place_id": {
             "title": "Place Id",
             "type": "string"
           },
+          "points": {
+            "description": "3-4 bullets, matched ones first",
+            "items": {
+              "$ref": "#/components/schemas/WhyPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
           "why": {
+            "description": "the `points` joined into one line; empty when there are none",
             "title": "Why",
             "type": "string"
           }
@@ -1277,6 +1286,26 @@
           "why"
         ],
         "title": "WhyOut",
+        "type": "object"
+      },
+      "WhyPoint": {
+        "properties": {
+          "matched": {
+            "description": "true when the bullet is close to what the user typed; false when it is one of the place's general strengths shown to fill the list",
+            "title": "Matched",
+            "type": "boolean"
+          },
+          "text": {
+            "description": "one short Vietnamese bullet taken from the place's reviews",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "matched"
+        ],
+        "title": "WhyPoint",
         "type": "object"
       }
     }
@@ -1891,7 +1920,7 @@
     },
     "/api/match/{place_id}/why": {
       "get": {
-        "description": "'Why this place?' written by Gemini. (Task 5, not implemented yet.)",
+        "description": "'Why this place?': 3-4 short bullets from the reviews that fit what the user typed.\n\nThe bullets are written offline by `scripts/generate_insights.py`; here they are only chosen by\nembedding similarity to `mood`, so no LLM is called. Empty `points` = the place has no insights yet.",
         "operationId": "why_api_match__place_id__why_get",
         "parameters": [
           {

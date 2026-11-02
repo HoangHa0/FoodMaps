@@ -36,7 +36,7 @@ from app.modules.reviews.analysis import count_terms
 from app.modules.reviews.moderation import check_text
 
 # Bump when a prompt or its output format changes: the places are then regenerated on the next run.
-PROMPT_VERSION = "4"  # main call
+PROMPT_VERSION = "8"  # main call
 SUMMARY_PROMPT_VERSION = "1"  # summary call
 
 SUMMARY_REVIEW_SOURCES = ("user",)  # the summary is written from website reviews only
@@ -193,6 +193,15 @@ def build_messages(place_name: str, category: str, reviews_text: str, n_reviews:
             '  e.g. "Đồ uống được nhiều người nhận xét là khá đắt",',
             '  never a clumsy fragment like "Đắt giá đồ uống".',
             '- Never use a bare score as a point (e.g. "Dịch vụ 3 sao"): say what reviewers actually said.',
+            "- Keep a point in pros and highlights only if MORE reviews say it than contradict it",
+            "  (4 praise vs 1 complaint: keep it; 1 vs 1 or 1 vs 2: a tie or worse, so leave it out of",
+            "  pros and highlights and keep only the complaint in cons).",
+            "  Compare reviews about the SAME specific point only (e.g. food quality, staff, cleanliness);",
+            "  a complaint about one point never removes praise of another. Count each point once and",
+            "  merge near-duplicates into a single bullet.",
+            '  Complaints always go to cons, written plainly (e.g. "Giá có xu hướng tăng").',
+            '  Use "Có ý kiến cho rằng ..." ONLY for a complaint that clearly contradicts a point most',
+            "  reviews praise, and at most once in the cons list.",
             "- If the reviews do not support something, use null (or an empty list). Silence beats a guess.",
             "",
             "Return ONE JSON object and nothing else, with exactly these keys:",
@@ -222,10 +231,15 @@ def build_messages(place_name: str, category: str, reviews_text: str, n_reviews:
             questions,
             "",
             f"highlights: {MAX_HIGHLIGHTS - 4}-{MAX_HIGHLIGHTS} distinct bullets (max {MAX_HIGHLIGHT_CHARS} "
-            "characters).",
-            'Each states ONE fact found in the reviews, e.g. "Không gian yên tĩnh", "Có nhiều ổ điện",',
-            '"Có chỗ gửi xe máy rộng". "support" is the number of reviews that mention it (1 to the number',
-            "of reviews given). Most mentioned first.",
+            "characters) that are REASONS TO GO to this place.",
+            "Only positive or neutral facts: never a complaint or a weakness (those belong in cons).",
+            "Each states ONE fact found in the reviews as a complete, friendly Vietnamese sentence, e.g.",
+            '"Không gian được nhiều người nhận xét là yên tĩnh", "Quán có nhiều ổ điện để cắm laptop",',
+            '"Có chỗ gửi xe máy rộng rãi"; never a bare fragment such as "Giá tăng" or "Rau cho ít".',
+            '"support" is the number of reviews that mention it (1 to the number of reviews given).',
+            "Most mentioned first.",
+            'Write the fact itself and never how many reviewers said it: "Nhân viên nhiệt tình", not',
+            '"Nhân viên nhiệt tình được một reviewer khen".',
         ]
     )
     return system, _user_message(place_name, category, reviews_text, n_reviews)

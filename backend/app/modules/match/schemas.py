@@ -59,8 +59,23 @@ class RejectIn(BaseModel):
     )
 
 
+class WhyPoint(BaseModel):
+    text: str = Field(description="one short Vietnamese bullet taken from the place's reviews")
+    matched: bool = Field(
+        description="true when the bullet is close to what the user typed; false when it is one of the "
+        "place's general strengths shown to fill the list"
+    )
+
+
 class WhyOut(BaseModel):
-    """'Why this place?'. Separate endpoint because the LLM call is slow."""
+    """'Why this place?'. Bullets written offline from the reviews and picked by similarity to the
+    search text: no LLM runs here, so the answer is instant.
+
+    Show `points` as a list (a "Phù hợp với bạn" label may be used for `matched` ones) and put the
+    `reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the
+    place has no insights yet: show the Match `reasons` only.
+    """
 
     place_id: str
-    why: str
+    why: str = Field(description="the `points` joined into one line; empty when there are none")
+    points: list[WhyPoint] = Field(default_factory=list, description="3-4 bullets, matched ones first")

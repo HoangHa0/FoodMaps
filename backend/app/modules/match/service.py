@@ -9,6 +9,9 @@ Pipeline (shared by AI Match, Group Session and Food Journey, only `k` differs):
     3. in Python: exact distance, hard filters (radius, budget), Match Score, top k  (scoring.py)
     4. short tags for the winners only, taken from their reviews
 
+"Why this place" (`why`) encodes the mood once more and compares it with the stored highlight bullets
+of ONE place (`why.py`); no LLM is called.
+
 "Not Match" (`reject`) runs steps 1-3 again, but only over the backups the client still holds, and
 then reorders them by the reason the user gave (`scoring.rerank_after_reject`). The server keeps no
 state: the client sends the remaining place_ids.
@@ -23,10 +26,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
-from app.core.errors import AppError
+from app.core.errors import AppError, not_found
 from app.modules.match.embedding import EMBED_MODEL, encode_queries
-from app.modules.match.models import Place, PlaceEmbedding
-from app.modules.match.schemas import MatchResponse, MatchResult, RejectIn
+from app.modules.match.models import Place, PlaceEmbedding, PlaceHighlight, PlaceInsight
+from app.modules.match.schemas import MatchResponse, MatchResult, RejectIn, WhyOut, WhyPoint
 from app.modules.match.scoring import (
     RawCandidate,
     Scored,
@@ -39,6 +42,7 @@ from app.modules.match.scoring import (
     with_crowd,
 )
 from app.modules.match.text_builder import top_values
+from app.modules.match.why import Highlight, WhyPick, join_points, pick_points
 from app.modules.reviews.models import Review
 from app.shared.contracts import MatchCriteria, PlaceCandidate, StubCandidateProvider
 
@@ -310,3 +314,53 @@ async def _reject_stub(data: RejectIn) -> list[MatchResult]:
     ranked = rerank_after_reject(scored, str(data.reason), rejected_place_id=data.rejected_place_id)
     by_id = {c.place_id: c for c in stub}
     return [MatchResult(**by_id[s.place_id].model_dump()) for s in ranked]
+
+
+# --------------------------------------------------------------------------- "Why this place?"
+
+
+async def _highlights_for(db: AsyncSession, place_id: str, query_vec: list[float]) -> list[Highlight]:
+    """Every stored bullet of one place with its cosine similarity to the query.
+
+    Only bullets whose vectors come from the current embedding model are compared: a query vector
+    only matches vectors of its own model (same rule as the place search).
+    """
+    distance = PlaceHighlight.embedding.cosine_distance(query_vec)
+    rows = await db.execute(
+        select(PlaceHighlight.content, PlaceHighlight.support, (1 - distance).label("similarity"))
+        .join(PlaceInsight, PlaceInsight.place_id == PlaceHighlight.place_id)
+        .where(PlaceHighlight.place_id == place_id, PlaceInsight.embedding_model == EMBED_MODEL)
+    )
+    return [Highlight(r.content, int(r.support), float(r.similarity)) for r in rows]
+
+
+def _why_out(place_id: str, picks: list[WhyPick]) -> WhyOut:
+    return WhyOut(
+        place_id=place_id,
+        why=join_points(picks),
+        points=[WhyPoint(text=p.text, matched=p.matched) for p in picks],
+    )
+
+
+async def why(db: AsyncSession, place_id: str, mood: str) -> WhyOut:
+    """GET /api/match/{place_id}/why: pick the stored bullets that fit the mood (no LLM).
+
+    With USE_STUB_MATCH=true it returns sample bullets so the UI can be built first.
+    """
+    if get_settings().use_stub_match:
+        return _why_out(place_id, _STUB_WHY)
+    if await db.scalar(select(Place.place_id).where(Place.place_id == place_id)) is None:
+        raise not_found("Quán")
+    candidates = await _highlights_for(db, place_id, await _encode_mood(mood))
+    return _why_out(place_id, pick_points(candidates))
+
+
+_STUB_WHY = [
+    WhyPick(text, matched)
+    for text, matched in (
+        ("Không gian yên tĩnh", True),
+        ("Có nhiều ổ điện", True),
+        ("Được đánh giá là phù hợp để học bài và làm việc", True),
+        ("Giá đồ uống hơi cao", False),
+    )
+]
