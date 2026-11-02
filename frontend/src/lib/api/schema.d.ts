@@ -273,7 +273,10 @@ export interface paths {
         };
         /**
          * Why
-         * @description 'Why this place?' written by Gemini. (Task 5, not implemented yet.)
+         * @description 'Why this place?': 3-4 short bullets from the reviews that fit what the user typed.
+         *
+         *     The bullets are written offline by `scripts/generate_insights.py`; here they are only chosen by
+         *     embedding similarity to `mood`, so no LLM is called. Empty `points` = the place has no insights yet.
          */
         get: operations["why_api_match__place_id__why_get"];
         put?: never;
@@ -947,13 +950,39 @@ export interface components {
         };
         /**
          * WhyOut
-         * @description 'Why this place?'. Separate endpoint because the LLM call is slow.
+         * @description 'Why this place?'. Bullets written offline from the reviews and picked by similarity to the
+         *     search text: no LLM runs here, so the answer is instant.
+         *
+         *     Show `points` as a list (a "Phù hợp với bạn" label may be used for `matched` ones) and put the
+         *     `reasons` of the Match result (distance, price, rating) next to them. `points` is empty when the
+         *     place has no insights yet: show the Match `reasons` only.
          */
         WhyOut: {
             /** Place Id */
             place_id: string;
-            /** Why */
+            /**
+             * Points
+             * @description 3-4 bullets, matched ones first
+             */
+            points?: components["schemas"]["WhyPoint"][];
+            /**
+             * Why
+             * @description the `points` joined into one line; empty when there are none
+             */
             why: string;
+        };
+        /** WhyPoint */
+        WhyPoint: {
+            /**
+             * Matched
+             * @description true when the bullet is close to what the user typed; false when it is one of the place's general strengths shown to fill the list
+             */
+            matched: boolean;
+            /**
+             * Text
+             * @description one short Vietnamese bullet taken from the place's reviews
+             */
+            text: string;
         };
     };
     responses: never;
