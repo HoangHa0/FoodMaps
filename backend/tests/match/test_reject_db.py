@@ -46,6 +46,8 @@ async def test_too_far_puts_the_closest_remaining_place_first(db_client, seed_pl
     body = r.json()
     assert _ids(body) == [near, mid, far]
     assert body["best"]["distance_m"] < 200  # the card still has real numbers
+    names = [body["best"]["name"]] + [b["name"] for b in body["backups"]]
+    assert names == ["near", "mid", "far"]  # the team's own names (places.manual_name)
     assert body["best"]["match_score"] > 0
 
 

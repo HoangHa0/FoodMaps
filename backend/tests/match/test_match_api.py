@@ -18,10 +18,11 @@ async def test_match_returns_best_and_three_backups(client):
     assert body["best"]["place_id"] == "stub_place_cafe_yen_tinh"
     assert len(body["backups"]) == 3
     expected = {
-        "place_id", "match_score", "tags", "distance_m", "reasons",
+        "place_id", "name", "match_score", "tags", "distance_m", "reasons",
         "price_per_person", "avg_rating", "review_count",
     }  # fmt: skip
     assert expected <= set(body["best"])
+    assert body["best"]["name"] == "Cà phê Yên Tĩnh"  # sample name, so the UI can show a title
 
 
 async def test_match_rejects_inverted_budget(client):

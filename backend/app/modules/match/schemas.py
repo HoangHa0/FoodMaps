@@ -19,6 +19,11 @@ class MatchResult(PlaceCandidate):
     tags (3-4 short tags), distance_m (straight-line metres, None when the request has no origin).
     """
 
+    name: str | None = Field(
+        default=None,
+        description="the team's own name for the place (`places.manual_name`), not Google data: show it "
+        "on the result card. The live Google name, photo and rating come from M7 with attribution",
+    )
     price_per_person: int | None = Field(
         default=None, description="estimated VND per person (median of the reviews); null if unknown"
     )
