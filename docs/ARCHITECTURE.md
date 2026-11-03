@@ -41,7 +41,7 @@ foodmaps/
 │       │   ├── (auth)/login, register
 │       │   ├── group/, group/[code]
 │       │   ├── journey/, me/
-│       │   └── dev/ui/              UI kit page for reviewing components
+│       │   └── dev/ui/, dev/reviews/  UI kit page; try the review form on any place_id
 │       ├── ui/                      design system: tokens, themes, primitive components
 │       ├── lib/api/                 typed API client generated from OpenAPI
 │       └── features/<name>/         index.ts (public) · api.ts · hooks/ · components/
@@ -112,18 +112,19 @@ imports a feature only through its `index.ts`.
   Sheet, ProgressBar, Spinner). Layout utilities (`flex`, `gap-4`, `p-6`, ...) are used freely.
 - `npm run check:design` (part of `make lint`) rejects hard-coded colours and arbitrary Tailwind
   values for colour, radius and shadow in `src/features` and `src/app`.
-- `/dev/ui` shows every primitive on one page.
+- `/dev/ui` shows every primitive on one page. `/dev/reviews` mounts `<ReviewForm>` on any `place_id`
+  until the place detail screen exists.
 
 ## 5. Contracts between modules
 
-| Contract | Defined in | Provided by | Used by |
-|---|---|---|---|
-| Current user | `backend/app/shared/auth.py` (`CurrentUser`, `OptionalUser`) | M1 | M2, M4, M5 |
-| Candidate places | `backend/app/shared/contracts.py` (`CandidateProvider`) | M3 | M5, M6 |
-| Place card (live name/photo/rating + attribution) | `GET /api/places/{place_id}/summary` and `<PlaceSummaryCard>` from `@/features/places` | M7 | M3, M4, M5 |
-| Login state in the frontend | `useMe()` from `@/features/auth` | M1 | all features |
-| UI primitives | `@/ui` (component props) | design system | all features |
-| API errors | `{"error": {"code", "message"}}` (`app/core/errors.py`, `lib/api/errors.ts`) | core | all |
+| Contract                                          | Defined in                                                                             | Provided by   | Used by      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------- | ------------ |
+| Current user                                      | `backend/app/shared/auth.py` (`CurrentUser`, `OptionalUser`)                           | M1            | M2, M4, M5   |
+| Candidate places                                  | `backend/app/shared/contracts.py` (`CandidateProvider`)                                | M3            | M5, M6       |
+| Place card (live name/photo/rating + attribution) | `GET /api/places/{place_id}/summary` and `<PlaceSummaryCard>` from `@/features/places` | M7            | M3, M4, M5   |
+| Login state in the frontend                       | `useMe()` from `@/features/auth`                                                       | M1            | all features |
+| UI primitives                                     | `@/ui` (component props)                                                               | design system | all features |
+| API errors                                        | `{"error": {"code", "message"}}` (`app/core/errors.py`, `lib/api/errors.ts`)           | core          | all          |
 
 Changing a contract is a separate pull request reviewed by the modules that use it.
 

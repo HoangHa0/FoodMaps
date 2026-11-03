@@ -186,9 +186,10 @@ the same input always gives the same output.
   so the "Not Match" reroll needs no server-side state.
 - **Only the current embedding model is matched** (`model_name = EMBED_MODEL`): vectors from
   different models are not comparable.
-- **No Google data is stored or returned.** The API returns `place_id`; name and photo come from
-  the google_places module (M7). While the AI pipeline is not configured,
-  `USE_STUB_MATCH=true` returns sample data so the UI can be built first.
+- **No Google data is stored or returned.** The API returns `place_id` and `name`, the team's own
+  name of the place (`places.manual_name`, typed by the team, not taken from Google), so a result
+  card has a title before M7 exists. The live Google name, photo and rating still come from the
+  google_places module (M7) with attribution.
 
 **Known limits.** Distance ignores real roads.
 
@@ -214,7 +215,16 @@ the rules below protect their quality without adding infrastructure.
 | Rate limit: 5 new reviews per user per 10 minutes, counted in PostgreSQL; editing is not limited                                                                                 | No Redis (D1). Known limit: it counts existing rows, so delete + re-create resets it                                                                                                                                                    |
 | Review Analysis is plain code (`analysis.py`): aspect averages, top dishes, pros/cons, tags, crowd, median price                                                                 | Free, instant, deterministic. A term counts once per review and is grouped ignoring case and accents, so "Phở bò" = "pho bo"                                                                                                            |
 
-**Not done yet (next tasks).** Embeddings are recomputed offline (`scripts/compute_embeddings.py`),
+**Web form** (`frontend/src/features/reviews/`, component `ReviewForm`): the user picks 1-5 stars for the four
+aspects (required) and may add a comment, dishes, "suitable for" tags and the price per person. The form calls
+`GET /mine` first and pre-fills with the old review, so saving is a `PUT`; with no old review it is a `POST`.
+If the server still answers `409 review_exists` (the review was written on another device), the client looks
+the old review up and edits it, so the user never sees that error. Guests see a login prompt (`useRequireAuth`).
+The client-side checks (`lib/validation.ts`) copy the limits of `schemas.py` only to give early feedback; the
+backend stays the source of truth. A review the text filter flagged is saved normally and the form tells the
+author that only they can see it for now.
+
+**Not done yet (next tasks).** The place detail screen (M2/M7) still has to mount `<ReviewForm placeId=... />`; until then use `/dev/reviews`. Embeddings are recomputed offline (`scripts/compute_embeddings.py`),
 so a new website review changes search results only after the script is re-run. `pros` / `cons`
 of website reviews stay empty until an LLM job fills them (Review Analysis already reads them).
 
