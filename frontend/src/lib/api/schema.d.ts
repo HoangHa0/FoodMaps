@@ -654,6 +654,11 @@ export interface components {
             distance_m?: number | null;
             /** Match Score */
             match_score: number;
+            /**
+             * Name
+             * @description the team's own name for the place (`places.manual_name`), not Google data: show it on the result card. The live Google name, photo and rating come from M7 with attribution
+             */
+            name?: string | null;
             /** Place Id */
             place_id: string;
             /**

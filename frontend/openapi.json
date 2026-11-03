@@ -496,6 +496,18 @@
             "title": "Match Score",
             "type": "number"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the team's own name for the place (`places.manual_name`), not Google data: show it on the result card. The live Google name, photo and rating come from M7 with attribution",
+            "title": "Name"
+          },
           "place_id": {
             "title": "Place Id",
             "type": "string"

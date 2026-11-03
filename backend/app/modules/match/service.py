@@ -60,6 +60,17 @@ from app.modules.match.why import Highlight, WhyPick, join_points, pick_points
 from app.modules.reviews.models import Review
 from app.shared.contracts import MatchCriteria, PlaceCandidate, StubCandidateProvider
 
+# Sample names for the stub places, so the UI can show a name before the AI pipeline exists
+STUB_NAMES = {
+    "stub_place_cafe_yen_tinh": "Cà phê Yên Tĩnh",
+    "stub_place_bun_cha": "Bún chả Hàng Quạt",
+    "stub_place_tra_chanh": "Trà chanh Nhà Thờ",
+    "stub_place_lau_nuong": "Lẩu nướng Bốn Mùa",
+    "stub_place_banh_ngot": "Tiệm bánh ngọt Mây",
+    "stub_place_pho_dem": "Phở đêm Cô Lan",
+    "stub_place_ca_phe_trung": "Cà phê trứng Giảng",
+}
+
 BACKUP_COUNT = 3  # spec: "top 2-3 quán dự phòng"
 POOL_LIMIT = 300  # safety cap on rows read per search (the real data is 100-300 places)
 METERS_PER_DEGREE = 111_320
@@ -133,10 +144,21 @@ async def _crowd_for(db: AsyncSession, place_ids: list[str]) -> dict[str, float 
     return {pid: mean_crowd(levels[pid]) for pid in place_ids}
 
 
-def _to_results(scored: list[Scored], tags: dict[str, list[str]]) -> list[MatchResult]:
+async def _names_for(db: AsyncSession, scored: list[Scored]) -> dict[str, str]:
+    """The team's own place names (`places.manual_name`), one query for the whole result."""
+    if not scored:
+        return {}
+    rows = await db.execute(
+        select(Place.place_id, Place.manual_name).where(Place.place_id.in_([s.place_id for s in scored]))
+    )
+    return {row.place_id: row.manual_name for row in rows}
+
+
+def _to_results(scored: list[Scored], tags: dict[str, list[str]], names: dict[str, str]) -> list[MatchResult]:
     return [
         MatchResult(
             place_id=s.place_id,
+            name=names.get(s.place_id),
             match_score=round(s.score, 4),
             tags=tags[s.place_id],
             distance_m=s.distance_m,
@@ -175,7 +197,7 @@ class MatchCandidateProvider:
 
     async def _search(self, db: AsyncSession, criteria: MatchCriteria, k: int) -> list[MatchResult]:
         top = await self._scored(db, criteria, k)
-        return _to_results(top, await _tags_for(db, top))
+        return _to_results(top, await _tags_for(db, top), await _names_for(db, top))
 
     async def rerank_after_reject(
         self, criteria: MatchCriteria, reason: str, rejected_place_id: str, remaining: list[str]
@@ -196,7 +218,7 @@ class MatchCandidateProvider:
         scored = await self._scored(db, criteria, len(ids), place_ids=ids)
         scored = with_crowd(scored, await _crowd_for(db, ids))
         ranked = rerank_after_reject(scored, reason, rejected_place_id=rejected_id)
-        return _to_results(ranked, await _tags_for(db, ranked))
+        return _to_results(ranked, await _tags_for(db, ranked), await _names_for(db, ranked))
 
     async def _scored(
         self,
@@ -284,7 +306,7 @@ async def match(db: AsyncSession, criteria: MatchCriteria) -> MatchResponse:
     if get_settings().use_stub_match:
         _validate(criteria)
         stub = await StubCandidateProvider().find_candidates(criteria, k)
-        return split_best_and_backups([MatchResult(**c.model_dump()) for c in stub])
+        return split_best_and_backups([_stub_result(c) for c in stub])
     return split_best_and_backups(await MatchCandidateProvider(db).search(criteria, k))
 
 
@@ -303,6 +325,10 @@ async def reject(db: AsyncSession, data: RejectIn) -> MatchResponse:
         criteria, str(data.reason), data.rejected_place_id, data.remaining
     )
     return split_best_and_backups(results)
+
+
+def _stub_result(c: PlaceCandidate) -> MatchResult:
+    return MatchResult(**c.model_dump(), name=STUB_NAMES.get(c.place_id))
 
 
 async def _reject_stub(data: RejectIn) -> list[MatchResult]:
@@ -327,7 +353,7 @@ async def _reject_stub(data: RejectIn) -> list[MatchResult]:
     ]
     ranked = rerank_after_reject(scored, str(data.reason), rejected_place_id=data.rejected_place_id)
     by_id = {c.place_id: c for c in stub}
-    return [MatchResult(**by_id[s.place_id].model_dump()) for s in ranked]
+    return [_stub_result(by_id[s.place_id]) for s in ranked]
 
 
 # --------------------------------------------------------------------------- "Why this place?"
