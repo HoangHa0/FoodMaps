@@ -134,5 +134,6 @@ Changing a contract is a separate pull request reviewed by the modules that use 
   with a `*_fetched_at` timestamp (refreshed at most every 30 days).
 - Place names, ratings, review texts and photos from Google are **fetched live** through
   `modules/google_places` and never stored.
-- Hence tables such as `group_candidates` store only `place_id`; the UI renders names and photos
+- Hence tables such as `group_candidates` store only `place_id` plus our own data (score, tags and
+  the team's own name `places.manual_name`, DECISIONS D16); the UI renders Google names and photos
   through the place-card contract above.

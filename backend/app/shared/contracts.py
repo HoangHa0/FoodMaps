@@ -30,11 +30,16 @@ class PlaceCandidate(BaseModel):
     """One candidate place.
 
     Contains only data we are allowed to store (the Google `place_id`) plus data we generate
-    ourselves (score, tags). Name, photos and rating from Google must be fetched live through
-    the `google_places` module (M7) when displayed.
+    ourselves (score, tags, the team's own name). The live Google name, photos and rating must be
+    fetched through the `google_places` module (M7) when displayed.
     """
 
     place_id: str
+    name: str | None = Field(
+        default=None,
+        description="the team's own name for the place (`places.manual_name`, typed by the team, not "
+        "taken from Google; DECISIONS D10), so a card has a title before M7 exists",
+    )
     match_score: float = Field(ge=0, le=1)
     tags: list[str] = Field(default_factory=list, description="short system-generated tags")
     distance_m: int | None = None
@@ -49,25 +54,27 @@ class CandidateProvider(Protocol):
 class StubCandidateProvider:
     """Deterministic sample data for developing and testing M5 and M6."""
 
+    # (place_id, sample name, tags): the names let every UI show a title without the AI pipeline
     _FAKE = [
-        ("stub_place_cafe_yen_tinh", ["yên tĩnh", "học bài"]),
-        ("stub_place_bun_cha", ["ăn chính", "dưới 100k"]),
-        ("stub_place_tra_chanh", ["đông vui", "rẻ"]),
-        ("stub_place_lau_nuong", ["đi nhóm", "ăn tối"]),
-        ("stub_place_banh_ngot", ["tráng miệng", "date"]),
-        ("stub_place_pho_dem", ["ăn khuya"]),
-        ("stub_place_ca_phe_trung", ["cà phê", "đặc sản"]),
+        ("stub_place_cafe_yen_tinh", "Cà phê Yên Tĩnh", ["yên tĩnh", "học bài"]),
+        ("stub_place_bun_cha", "Bún chả Hàng Quạt", ["ăn chính", "dưới 100k"]),
+        ("stub_place_tra_chanh", "Trà chanh Nhà Thờ", ["đông vui", "rẻ"]),
+        ("stub_place_lau_nuong", "Lẩu nướng Bốn Mùa", ["đi nhóm", "ăn tối"]),
+        ("stub_place_banh_ngot", "Tiệm bánh ngọt Mây", ["tráng miệng", "date"]),
+        ("stub_place_pho_dem", "Phở đêm Cô Lan", ["ăn khuya"]),
+        ("stub_place_ca_phe_trung", "Cà phê trứng Giảng", ["cà phê", "đặc sản"]),
     ]
 
     async def find_candidates(self, criteria: MatchCriteria, k: int) -> list[PlaceCandidate]:
         return [
             PlaceCandidate(
                 place_id=pid,
+                name=name,
                 match_score=round(0.95 - i * 0.07, 2),
                 tags=tags,
                 distance_m=300 + i * 250,
             )
-            for i, (pid, tags) in enumerate(self._FAKE[:k])
+            for i, (pid, name, tags) in enumerate(self._FAKE[:k])
         ]
 
 

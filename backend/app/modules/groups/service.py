@@ -193,7 +193,14 @@ async def start_room(
         raise AppError(409, "no_candidates", "Không tìm thấy quán phù hợp, thử tiêu chí khác")
 
     db.add_all(
-        GroupCandidate(room_id=room.id, place_id=c.place_id, rank=i, match_score=c.match_score, tags=c.tags)
+        GroupCandidate(
+            room_id=room.id,
+            place_id=c.place_id,
+            name=c.name,
+            rank=i,
+            match_score=c.match_score,
+            tags=c.tags,
+        )
         for i, c in enumerate(candidates)
     )
     room.status = "voting"
@@ -328,6 +335,7 @@ async def get_state(
             CandidateOut(
                 id=c.id,
                 place_id=c.place_id,
+                name=c.name,
                 rank=c.rank,
                 match_score=c.match_score,
                 tags=c.tags,

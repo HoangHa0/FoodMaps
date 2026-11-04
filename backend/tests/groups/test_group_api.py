@@ -178,6 +178,18 @@ async def test_start_creates_candidates_and_fixes_member_count(db_client):
     assert r.status_code == 409  # already started
 
 
+async def test_candidates_carry_the_team_name_of_each_place(db_client):
+    """The provider's name (places.manual_name, not Google data) reaches the cards and the result."""
+    host, a = await room_with_members(db_client, 2)
+    cands = (await start(db_client, host))["candidates"]
+    assert [c["name"] for c in cands[:2]] == ["Cà phê Yên Tĩnh", "Bún chả Hàng Quạt"]  # stub names
+    for member in (host, a):
+        await vote(db_client, member, cands[1]["id"])
+    s = await state(db_client, a)
+    winner = next(c for c in s["candidates"] if c["place_id"] == s["winner_place_id"])
+    assert s["status"] == "decided" and winner["name"] == "Bún chả Hàng Quạt"
+
+
 async def test_full_flow_decides_automatically_at_majority(db_client):
     host, a, b = await room_with_members(db_client, 3)
     cands = (await start(db_client, host))["candidates"]

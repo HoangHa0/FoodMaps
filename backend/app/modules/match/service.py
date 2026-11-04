@@ -60,17 +60,6 @@ from app.modules.match.why import Highlight, WhyPick, join_points, pick_points
 from app.modules.reviews.models import Review
 from app.shared.contracts import MatchCriteria, PlaceCandidate, StubCandidateProvider
 
-# Sample names for the stub places, so the UI can show a name before the AI pipeline exists
-STUB_NAMES = {
-    "stub_place_cafe_yen_tinh": "Cà phê Yên Tĩnh",
-    "stub_place_bun_cha": "Bún chả Hàng Quạt",
-    "stub_place_tra_chanh": "Trà chanh Nhà Thờ",
-    "stub_place_lau_nuong": "Lẩu nướng Bốn Mùa",
-    "stub_place_banh_ngot": "Tiệm bánh ngọt Mây",
-    "stub_place_pho_dem": "Phở đêm Cô Lan",
-    "stub_place_ca_phe_trung": "Cà phê trứng Giảng",
-}
-
 BACKUP_COUNT = 3  # spec: "top 2-3 quán dự phòng"
 POOL_LIMIT = 300  # safety cap on rows read per search (the real data is 100-300 places)
 METERS_PER_DEGREE = 111_320
@@ -328,7 +317,7 @@ async def reject(db: AsyncSession, data: RejectIn) -> MatchResponse:
 
 
 def _stub_result(c: PlaceCandidate) -> MatchResult:
-    return MatchResult(**c.model_dump(), name=STUB_NAMES.get(c.place_id))
+    return MatchResult(**c.model_dump())  # the stub already carries sample names
 
 
 async def _reject_stub(data: RejectIn) -> list[MatchResult]:
