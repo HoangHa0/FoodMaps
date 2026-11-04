@@ -377,3 +377,20 @@ should take dishes from one of them for a given screen, not both.
 **Known limits.** Insights appear only after `scripts/generate_insights.py` has run for the place (and, with the
 refresh policy of D13, may wait up to 14 days for a few new reviews). A hidden review is removed from the text
 at the next regeneration, or at once with `--place Qxxx --force`.
+
+## D16. Group Session cards (M5): the candidate carries the team's own place name
+
+Before this, `CandidateProvider.find_candidates` returned only `place_id`, score and tags, so the vote cards
+showed "Quán #1" plus a raw place ID: the name that `/api/match` already returns (D10) was dropped on the way.
+
+| Decision                                                                                   | Why                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PlaceCandidate.name` (optional) in `app/shared/contracts.py`                              | One field in the shared contract serves M5 and M6; `MatchResult` already inherits it. The stub provider carries the same sample names as `/api/match` |
+| `group_candidates.name` stores a copy taken when the host starts the room                  | It is `places.manual_name`, typed by the team, not Google data (D10), so storing it is allowed. A room lives 30 minutes: a snapshot is simpler than a join |
+| `CandidateOut.name` is `null` when the provider has no name                                | The UI falls back to "Quán #rank"                                                                                                                         |
+| The directions link uses the name as `destination` next to `destination_place_id`          | Google routes by the place ID when it is a real one and falls back to the text                                                                           |
+
+The host can also add an area: "Gần vị trí của tôi" sends the device position as `origin`, and only then are the
+radius chips shown, because the backend filters by distance from `origin` only.
+
+**Known limits.** The live Google name, photo and rating (M7 `PlaceSummaryCard`) are still missing from the cards.
