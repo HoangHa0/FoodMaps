@@ -104,6 +104,17 @@
             ],
             "title": "My Vote"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
           "place_id": {
             "title": "Place Id",
             "type": "string"
@@ -123,6 +134,7 @@
         "required": [
           "id",
           "place_id",
+          "name",
           "rank",
           "match_score",
           "tags",

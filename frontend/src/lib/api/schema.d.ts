@@ -467,6 +467,8 @@ export interface components {
             match_score: number;
             /** My Vote */
             my_vote: boolean | null;
+            /** Name */
+            name: string | null;
             /** Place Id */
             place_id: string;
             /** Rank */

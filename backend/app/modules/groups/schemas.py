@@ -51,7 +51,8 @@ class ParticipantOut(BaseModel):
 
 class CandidateOut(BaseModel):
     id: uuid.UUID
-    place_id: str  # name/photo fetched live via M7 (with attribution)
+    place_id: str  # live Google name/photo fetched via M7 (with attribution)
+    name: str | None  # the team's own name of the place (not Google data); None if unknown
     rank: int
     match_score: float
     tags: list[str]

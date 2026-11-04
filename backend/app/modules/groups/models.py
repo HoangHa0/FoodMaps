@@ -1,7 +1,8 @@
 """Group Session tables. All of this is data we generate ourselves, so it is kept permanently.
 
-Places are referenced by Google `place_id` only (allowed to store); never store Google names,
-photos or ratings here.
+Places are referenced by Google `place_id` (allowed to store) plus the team's own name of the place
+(`places.manual_name`, typed by the team, DECISIONS D10). Never store Google names, photos or
+ratings here.
 """
 
 import uuid
@@ -82,6 +83,8 @@ class GroupCandidate(Base):
         ForeignKey("group_rooms.id", ondelete="CASCADE"), nullable=False
     )
     place_id: Mapped[str] = mapped_column(String(300), nullable=False)
+    # Snapshot of the team's own name at start time (not Google data); None when the provider has none
+    name: Mapped[str | None] = mapped_column(String(200))
     rank: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 0 = best match; used as tie-breaker
     match_score: Mapped[float] = mapped_column(Float, nullable=False)
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
