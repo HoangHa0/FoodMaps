@@ -80,3 +80,15 @@ async def test_garbage_cookie_counts_as_guest(db_client):
 )
 async def test_invalid_input_is_422_not_500(db_client, username, password):
     assert (await _register(db_client, username, password)).status_code == 422
+
+
+@pytest.mark.parametrize("field", ["username", "password"])
+async def test_oversized_login_input_is_422(db_client, field):
+    body = {"username": "ha_nguyen", "password": PW, field: "x" * 5000}
+    assert (await db_client.post("/api/auth/login", json=body)).status_code == 422
+
+
+async def test_password_over_72_bytes_at_login_is_401_not_500(db_client):
+    await _register(db_client)
+    r = await db_client.post("/api/auth/login", json={"username": "ha_nguyen", "password": "ầ" * 30})
+    assert r.status_code == 401

@@ -23,9 +23,11 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    # No format rules at login (a wrong format is just "wrong credentials"), only size caps
-    username: str
-    password: str
+    # No format rules at login (a wrong format is just "wrong credentials"), only size caps so a
+    # huge body never reaches the database or bcrypt. Loose on purpose: anything that fits a real
+    # account passes and simply gets 401.
+    username: str = Field(max_length=100)
+    password: str = Field(max_length=1000)
 
 
 class UserOut(BaseModel):

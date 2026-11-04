@@ -1,14 +1,23 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-import { RegisterForm } from "@/features/auth";
+import { RegisterForm, safeNext } from "@/features/auth";
+
+function RegisterWithRedirect() {
+  const router = useRouter();
+  const next = safeNext(useSearchParams().get("next"));
+  return <RegisterForm next={next} onSuccess={() => router.replace(next)} />;
+}
 
 export default function RegisterPage() {
-  const router = useRouter();
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center p-6">
-      <RegisterForm onSuccess={() => router.replace("/")} />
+      {/* useSearchParams needs a Suspense boundary in the App Router */}
+      <Suspense>
+        <RegisterWithRedirect />
+      </Suspense>
     </main>
   );
 }

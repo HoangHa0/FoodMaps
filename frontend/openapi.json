@@ -363,10 +363,12 @@
       "LoginIn": {
         "properties": {
           "password": {
+            "maxLength": 1000,
             "title": "Password",
             "type": "string"
           },
           "username": {
+            "maxLength": 100,
             "title": "Username",
             "type": "string"
           }

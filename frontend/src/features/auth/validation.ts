@@ -16,3 +16,9 @@ export function validatePassword(p: string): string | undefined {
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
+
+/** "/login" or "/register", keeping where to return afterwards (omitted for the home page). */
+export function authHref(page: "/login" | "/register", next?: string | null): string {
+  const target = safeNext(next ?? null);
+  return target === "/" ? page : `${page}?${new URLSearchParams({ next: target }).toString()}`;
+}

@@ -1,15 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { type FormEvent, useState } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { Button, Card, Input } from "@/ui";
 
 import { useRegister } from "../hooks/useAuthMutations";
-import { validatePassword, validateUsername } from "../validation";
+import { authHref, validatePassword, validateUsername } from "../validation";
 
-/** Registration form. M1: client-side validation matching the backend (username 3-30 chars [A-Za-z0-9_.], password 8-72). */
-export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
+/**
+ * Registration form, with client-side validation matching the backend (username 3-30 chars
+ * [A-Za-z0-9_.], password 8-72 bytes). `next` = where the "Đăng nhập" link should return.
+ */
+export function RegisterForm({ onSuccess, next }: { onSuccess?: () => void; next?: string | null }) {
   const register = useRegister();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +43,10 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
           hint="Tối thiểu 8 ký tự" value={password} onChange={(e) => setPassword(e.target.value)}
           error={passwordError ?? (takenError ? undefined : serverError?.message)} required />
         <Button type="submit" fullWidth loading={register.isPending}>Đăng ký</Button>
+        <p className="text-sm text-fg-muted">
+          Đã có tài khoản?{" "}
+          <Link href={authHref("/login", next)} className="underline">Đăng nhập</Link>
+        </p>
       </form>
     </Card>
   );

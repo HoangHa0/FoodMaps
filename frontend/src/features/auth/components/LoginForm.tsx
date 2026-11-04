@@ -6,10 +6,13 @@ import { type FormEvent, useState } from "react";
 import { Button, Card, Input } from "@/ui";
 
 import { useLogin } from "../hooks/useAuthMutations";
+import { authHref } from "../validation";
 
-/** Login form. M1: wire up useLogin(), show ApiError.message, redirect on success. */
-/** `onSuccess` decides what happens next (page: redirect; LoginSheet: resume the action). */
-export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
+/**
+ * Login form. `onSuccess` decides what happens next (page: redirect; login sheet: resume the
+ * action). `next` = where the "Đăng ký" link should return after registering.
+ */
+export function LoginForm({ onSuccess, next }: { onSuccess?: () => void; next?: string | null }) {
   const login = useLogin();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +36,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         </Button>
         <p className="text-sm text-fg-muted">
           Chưa có tài khoản?{" "}
-          <Link href="/register" className="underline">Đăng ký</Link>
+          <Link href={authHref("/register", next)} className="underline">Đăng ký</Link>
         </p>
       </form>
     </Card>
