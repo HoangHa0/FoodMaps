@@ -92,7 +92,7 @@ export function RoomScreen({ code }: { code: string }) {
         <ResultView
           winner={winner}
           decidedBy={state.decided_by}
-          directionsUrl={directionsUrl(state.winner_place_id ?? "")}
+          directionsUrl={directionsUrl(state.winner_place_id ?? "", winner?.name ?? undefined)}
           onNewRoom={newRoom}
         />
       </Screen>

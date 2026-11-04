@@ -25,18 +25,23 @@ function Countdown({ seconds }: { seconds: number | null }) {
   );
 }
 
+/** Card title: the team's own name of the place, or its rank while the provider has no name. */
+export const candidateTitle = (c: Candidate) => c.name ?? `Quán #${c.rank + 1}`;
+
 /**
- * Temporary place card body. When M7 ships `<PlaceSummaryCard placeId=…>` (live name, photo and
- * rating with Google attribution), render it here instead: no other view needs to change.
+ * Place card body: our own data (name, match score, tags). When M7 ships
+ * `<PlaceSummaryCard placeId=…>` (live photo and rating with Google attribution), render it here
+ * as well: no other view needs to change.
  */
 export function PlaceCardBody({ candidate }: { candidate: Candidate }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-display text-lg font-semibold">Quán #{candidate.rank + 1}</h3>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-display text-lg font-semibold" data-testid="place-name">
+          {candidateTitle(candidate)}
+        </h3>
         <Badge tone="accent">{Math.round(candidate.match_score * 100)}% MATCH</Badge>
       </div>
-      <p className="break-all text-xs text-fg-muted">{candidate.place_id}</p>
       <div className="flex flex-wrap gap-1">
         {candidate.tags.map((t) => (
           <Badge key={t}>{t}</Badge>
@@ -248,12 +253,10 @@ export function HostProgressView({
         {candidates.map((c) => (
           <li key={c.id} className="flex flex-col gap-1">
             <div className="flex justify-between text-sm">
-              <span className="truncate">
-                #{c.rank + 1} · {c.tags.join(", ") || c.place_id}
-              </span>
+              <span className="truncate">{candidateTitle(c)}</span>
               <span className="font-medium">{c.likes} ♥</span>
             </div>
-            <ProgressBar value={c.likes} max={participants.length} marker={threshold} label={`Quán #${c.rank + 1}`} />
+            <ProgressBar value={c.likes} max={participants.length} marker={threshold} label={candidateTitle(c)} />
           </li>
         ))}
       </ul>
