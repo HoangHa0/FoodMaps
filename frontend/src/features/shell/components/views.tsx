@@ -17,7 +17,6 @@ import {
   Logo,
   Mascot,
   PopLines,
-  SearchInput,
   cn,
 } from "@/ui";
 
@@ -109,19 +108,25 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 // --------------------------------------------------------------------------- top bar
 
-export function TopBar({ userMenu, city, temperature }: { userMenu: ReactNode; city: string; temperature: string }) {
+export function TopBar({
+  search,
+  userMenu,
+  city,
+  temperature,
+}: {
+  search: ReactNode; // AI Match bar (desktop) / search button (phone)
+  userMenu: ReactNode;
+  city: string;
+  temperature: string;
+}) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 bg-bg/90 px-4 py-3 backdrop-blur lg:static lg:bg-transparent lg:pb-1.5 lg:pl-10 lg:pr-6 lg:pt-5 lg:backdrop-blur-none">
       <Link href="/" className="lg:hidden" aria-label="FoodMaps home">
         <Logo compact />
       </Link>
-      {/* TODO(M3): replace with the semantic SearchBar (collapsed <-> overlay) */}
-      <SearchInput
-        label="Search for cuisine, dish, or restaurant"
-        placeholder="Search for cuisine, dish, or restaurant..."
-        className="hidden max-w-154 flex-1 md:flex"
-      />
-      <div className="ml-auto flex items-center gap-3">
+      {/* takes the free width: the bar sits left on desktop, the phone button sits right */}
+      <div className="flex min-w-0 flex-1 items-center justify-end md:justify-start">{search}</div>
+      <div className="flex items-center gap-3">
         <button type="button" className="hidden h-10 items-center gap-2.5 rounded-control bg-surface px-5 text-sm font-semibold shadow-card sm:inline-flex">
           <IconPin className="size-4 fill-fg text-surface" aria-hidden />
           {city}
@@ -131,18 +136,9 @@ export function TopBar({ userMenu, city, temperature }: { userMenu: ReactNode; c
           <IconSun className="size-5 fill-primary text-primary" aria-hidden />
           {temperature}
         </span>
-        <IconSearchMobile />
-        <div className="ml-5">{userMenu}</div>
+        <div className="ml-2 sm:ml-5">{userMenu}</div>
       </div>
     </header>
-  );
-}
-
-function IconSearchMobile() {
-  return (
-    <button type="button" aria-label="Search" className="inline-flex size-10 items-center justify-center rounded-full bg-surface shadow-card md:hidden">
-      <IconSearch className="size-4.5" aria-hidden />
-    </button>
   );
 }
 

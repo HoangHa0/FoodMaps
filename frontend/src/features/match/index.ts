@@ -1,5 +1,5 @@
 /**
- * Feature: match (M3). Planned public components: SearchBar (collapsed <-> overlay), MoodChips,
- * MatchResultSheet, "not a fit" feedback.
+ * Public API of the match feature (AI Match UI; backend M3).
+ *   MatchSearch - collapsed search bar -> overlay -> result bottom sheet. Mounted in the top bar.
  */
-export {};
+export { MatchSearch } from "./components/MatchSearch";
