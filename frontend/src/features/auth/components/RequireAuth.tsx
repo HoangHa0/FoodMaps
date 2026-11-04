@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 
 import { Sheet } from "@/ui";
@@ -16,6 +17,7 @@ const GuardContext = createContext<Guard | null>(null);
  */
 export function RequireAuthProvider({ children }: { children: ReactNode }) {
   const { data: me } = useMe();
+  const pathname = usePathname();
   // Stored as { run } because useState treats a bare function as an updater and would CALL it
   const [pending, setPending] = useState<{ run: () => void } | null>(null);
 
@@ -32,6 +34,7 @@ export function RequireAuthProvider({ children }: { children: ReactNode }) {
       {children}
       <Sheet open={pending !== null} onClose={() => setPending(null)} title="Đăng nhập để tiếp tục" modal>
         <LoginForm
+          next={pathname} // "Đăng ký" leaves the sheet: come back to this page afterwards
           onSuccess={() => {
             pending?.run();
             setPending(null);

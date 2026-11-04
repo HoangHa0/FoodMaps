@@ -8,7 +8,7 @@ import { LoginForm, safeNext } from "@/features/auth";
 function LoginWithRedirect() {
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
-  return <LoginForm onSuccess={() => router.replace(next)} />;
+  return <LoginForm next={next} onSuccess={() => router.replace(next)} />;
 }
 
 export default function LoginPage() {

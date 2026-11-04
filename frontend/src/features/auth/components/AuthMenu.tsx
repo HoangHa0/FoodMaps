@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { IconChevronDown, IconLogin, IconLogout, IconRegister, Mascot, Spinner } from "@/ui";
 
 import { useLogout } from "../hooks/useAuthMutations";
 import { useMe } from "../hooks/useMe";
+import { authHref } from "../validation";
 
 /**
  * Header corner: mascot avatar + chevron opening a small menu.
@@ -15,6 +17,9 @@ import { useMe } from "../hooks/useMe";
 export function AuthMenu() {
   const { data: me, isPending } = useMe();
   const logout = useLogout();
+  // On the login/register pages themselves, keep their own ?next= instead of pointing at them
+  const pathname = usePathname();
+  const here = pathname === "/login" || pathname === "/register" ? null : pathname;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -72,10 +77,10 @@ export function AuthMenu() {
             </>
           ) : (
             <>
-              <Link href="/login" role="menuitem" className={item} onClick={close}>
+              <Link href={authHref("/login", here)} role="menuitem" className={item} onClick={close}>
                 <IconLogin className="size-4" aria-hidden /> Đăng nhập
               </Link>
-              <Link href="/register" role="menuitem" className={item} onClick={close}>
+              <Link href={authHref("/register", here)} role="menuitem" className={item} onClick={close}>
                 <IconRegister className="size-4" aria-hidden /> Đăng ký
               </Link>
             </>
