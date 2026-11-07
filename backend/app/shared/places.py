@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.match.models import Place
 
 EARTH_RADIUS_M = 6_371_000
-METRES_PER_DEGREE = 111_320
+METRES_PER_DEGREE = EARTH_RADIUS_M * math.pi / 180
 
 
 class PlaceRef(BaseModel):

@@ -68,3 +68,14 @@ async def db_client(_migrated_test_db):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(_migrated_test_db):
+    """Plain session on foodmaps_test with `places` emptied, for tests that call services directly."""
+    engine = create_async_engine(TEST_DATABASE_URL)
+    async with engine.begin() as conn:
+        await conn.execute(text("TRUNCATE places CASCADE"))
+    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+        yield session
+    await engine.dispose()
