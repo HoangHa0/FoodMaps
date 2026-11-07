@@ -1,5 +1,3 @@
-/**
- * Feature: map (M2). Planned public components: MapView (Google Maps JS + AdvancedMarkerElement),
- * saved-place pins, SaveIconPicker, "paste a Google Maps link" import.
- */
-export {};
+/** Public API of VietMap-backed map components. */
+export { VietMap } from "./VietMap";
+export { mapApi, type MapPlace } from "./api";
