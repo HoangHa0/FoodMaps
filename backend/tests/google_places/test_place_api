@@ -1,0 +1,103 @@
+"""GET /api/places/map and GET /api/places/{place_id}/summary (M7). Both are public."""
+
+import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from tests.conftest import TEST_DATABASE_URL
+
+pytestmark = pytest.mark.db
+
+CAFE_ID = "map_test_place_cafe"
+NOODLE_ID = "map_test_place_noodle"
+IDS = [CAFE_ID, NOODLE_ID]
+
+
+@pytest.fixture
+async def engine(db_client):
+    eng = create_async_engine(TEST_DATABASE_URL)
+    yield eng
+    await eng.dispose()
+
+
+@pytest.fixture
+async def seeded(engine):
+    """Two test places. place_code decides the order of the list (M901 before M902)."""
+    async with engine.begin() as conn:
+        await conn.execute(text("delete from places where place_id = any(:ids)"), {"ids": IDS})
+        await conn.execute(
+            text(
+                "insert into places (place_id, place_code, manual_name, category, lat, lng, "
+                "address, google_maps_url, price_per_person, tiktok_urls) "
+                "values (:pid, 'M901', 'Cà phê Test', 'cafe', 21.03, 105.85, "
+                "'1 Phố Test, Hà Nội', 'https://maps.google.com/?cid=1', 45000, :tiktok)"
+            ),
+            {"pid": CAFE_ID, "tiktok": ["https://www.tiktok.com/@test/video/1"]},
+        )
+        await conn.execute(
+            text(
+                "insert into places (place_id, place_code, manual_name, category, lat, lng) "
+                "values (:pid, 'M902', 'Phở Test', 'main_meal', 21.04, 105.86)"
+            ),
+            {"pid": NOODLE_ID},
+        )
+    yield
+    async with engine.begin() as conn:
+        await conn.execute(text("delete from places where place_id = any(:ids)"), {"ids": IDS})
+
+
+async def test_map_lists_places_for_guests_with_only_pin_fields(db_client, seeded):
+    r = await db_client.get("/api/places/map")  # no login cookie
+
+    assert r.status_code == 200
+    by_id = {p["place_id"]: p for p in r.json()}
+    assert by_id[CAFE_ID] == {
+        "place_id": CAFE_ID,
+        "name": "Cà phê Test",
+        "category": "cafe",
+        "lat": 21.03,
+        "lng": 105.85,
+    }
+    assert by_id[NOODLE_ID]["name"] == "Phở Test"
+
+
+async def test_map_is_ordered_by_place_code(db_client, seeded):
+    r = await db_client.get("/api/places/map")
+
+    ids = [p["place_id"] for p in r.json()]
+    assert ids.index(CAFE_ID) < ids.index(NOODLE_ID)
+
+
+async def test_summary_returns_the_place_facts(db_client, seeded):
+    r = await db_client.get(f"/api/places/{CAFE_ID}/summary")
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "place_id": CAFE_ID,
+        "name": "Cà phê Test",
+        "category": "cafe",
+        "address": "1 Phố Test, Hà Nội",
+        "google_maps_url": "https://maps.google.com/?cid=1",
+        "lat": 21.03,
+        "lng": 105.85,
+        "price_per_person": 45000,
+        "tiktok_urls": ["https://www.tiktok.com/@test/video/1"],
+    }
+
+
+async def test_summary_of_a_place_without_optional_fields(db_client, seeded):
+    r = await db_client.get(f"/api/places/{NOODLE_ID}/summary")
+
+    body = r.json()
+    assert r.status_code == 200
+    assert body["address"] is None
+    assert body["google_maps_url"] is None
+    assert body["price_per_person"] is None
+    assert body["tiktok_urls"] == []
+
+
+async def test_summary_of_an_unknown_place_is_404(db_client):
+    r = await db_client.get("/api/places/does_not_exist/summary")
+
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == "not_found"
