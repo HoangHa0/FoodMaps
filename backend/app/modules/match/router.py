@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.modules.match import service
-from app.modules.match.schemas import InsightsOut, MatchResponse, RejectIn, WhyOut
+from app.modules.match.schemas import InsightsOut, MapPlace, MatchResponse, RejectIn, WhyOut
 from app.shared.contracts import MatchCriteria
 
 router = APIRouter(prefix="/match", tags=["M3 match"])
@@ -14,6 +14,12 @@ Db = Annotated[AsyncSession, Depends(get_db)]
 
 
 # Guests can call these: no CurrentUser dependency.
+
+
+@router.get("/places", response_model=list[MapPlace])
+async def map_places(db: Db) -> list[MapPlace]:
+    """List stored FoodMaps places and real coordinates for the public home map."""
+    return await service.list_map_places(db)
 
 
 @router.post("", response_model=MatchResponse)

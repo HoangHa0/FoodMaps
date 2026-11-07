@@ -380,6 +380,83 @@
         "title": "LoginIn",
         "type": "object"
       },
+      "MapPlace": {
+        "description": "A stored FoodMaps place with real coordinates and website-user rating for the public home map.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "avg_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "mean of visible website-user reviews; null if there are none",
+            "title": "Avg Rating"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Per Person"
+          },
+          "review_count": {
+            "description": "number of visible website-user reviews",
+            "title": "Review Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng",
+          "address",
+          "price_per_person",
+          "avg_rating",
+          "review_count"
+        ],
+        "title": "MapPlace",
+        "type": "object"
+      },
       "MatchCriteria": {
         "description": "Search criteria shared by AI Match, Group Session and Food Journey.",
         "properties": {
@@ -490,7 +567,7 @@
                 "type": "null"
               }
             ],
-            "description": "mean of our own reviews (sheet + web), 1..5; null when the place has no review",
+            "description": "mean of visible website-user reviews only, 1..5; null if there are none",
             "title": "Avg Rating"
           },
           "distance_m": {
@@ -548,7 +625,7 @@
           },
           "review_count": {
             "default": 0,
-            "description": "number of visible reviews behind avg_rating",
+            "description": "number of visible website-user reviews behind avg_rating",
             "title": "Review Count",
             "type": "integer"
           },
@@ -2012,6 +2089,32 @@
           }
         },
         "summary": "Match",
+        "tags": [
+          "M3 match"
+        ]
+      }
+    },
+    "/api/match/places": {
+      "get": {
+        "description": "List stored FoodMaps places and real coordinates for the public home map.",
+        "operationId": "map_places_api_match_places_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MapPlace"
+                  },
+                  "title": "Response Map Places Api Match Places Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Map Places",
         "tags": [
           "M3 match"
         ]

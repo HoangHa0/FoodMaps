@@ -29,9 +29,11 @@ class MatchResult(PlaceCandidate):
     )
     avg_rating: float | None = Field(
         default=None,
-        description="mean of our own reviews (sheet + web), 1..5; null when the place has no review",
+        description="mean of visible website-user reviews only, 1..5; null if there are none",
     )
-    review_count: int = Field(default=0, description="number of visible reviews behind avg_rating")
+    review_count: int = Field(
+        default=0, description="number of visible website-user reviews behind avg_rating"
+    )
     reasons: list[str] = Field(
         default_factory=list,
         description="up to 4 ready-to-show Vietnamese lines (mood, distance, price, rating); a line is "
@@ -45,6 +47,22 @@ class MatchResponse(BaseModel):
         default_factory=list,
         description="up to 3 fallback places, best first; used by the 'Không hợp' button",
     )
+
+
+class MapPlace(BaseModel):
+    """A stored FoodMaps place with real coordinates and website-user rating for the public home map."""
+
+    place_id: str
+    name: str
+    category: str
+    lat: float
+    lng: float
+    address: str | None
+    price_per_person: int | None
+    avg_rating: float | None = Field(
+        description="mean of visible website-user reviews; null if there are none"
+    )
+    review_count: int = Field(description="number of visible website-user reviews")
 
 
 class RejectReason(StrEnum):

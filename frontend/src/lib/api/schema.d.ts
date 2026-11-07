@@ -241,6 +241,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/match/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Map Places
+         * @description List stored FoodMaps places and real coordinates for the public home map.
+         */
+        get: operations["map_places_api_match_places_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match/reject": {
         parameters: {
             query?: never;
@@ -598,6 +618,36 @@ export interface components {
             username: string;
         };
         /**
+         * MapPlace
+         * @description A stored FoodMaps place with real coordinates and website-user rating for the public home map.
+         */
+        MapPlace: {
+            /** Address */
+            address: string | null;
+            /**
+             * Avg Rating
+             * @description mean of visible website-user reviews; null if there are none
+             */
+            avg_rating: number | null;
+            /** Category */
+            category: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Place Id */
+            place_id: string;
+            /** Price Per Person */
+            price_per_person: number | null;
+            /**
+             * Review Count
+             * @description number of visible website-user reviews
+             */
+            review_count: number;
+        };
+        /**
          * MatchCriteria
          * @description Search criteria shared by AI Match, Group Session and Food Journey.
          */
@@ -649,7 +699,7 @@ export interface components {
         MatchResult: {
             /**
              * Avg Rating
-             * @description mean of our own reviews (sheet + web), 1..5; null when the place has no review
+             * @description mean of visible website-user reviews only, 1..5; null if there are none
              */
             avg_rating?: number | null;
             /** Distance M */
@@ -675,7 +725,7 @@ export interface components {
             reasons?: string[];
             /**
              * Review Count
-             * @description number of visible reviews behind avg_rating
+             * @description number of visible website-user reviews behind avg_rating
              * @default 0
              */
             review_count: number;
@@ -1545,6 +1595,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_places_api_match_places_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapPlace"][];
                 };
             };
         };
