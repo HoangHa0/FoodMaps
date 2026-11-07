@@ -1,6 +1,9 @@
 """GET /api/match/places exposes stored places and their actual map coordinates."""
 
+import pytest
 from sqlalchemy import text
+
+pytestmark = pytest.mark.db
 
 
 async def test_map_places_does_not_expose_sheet_review_ratings(db_client, seed_place):
