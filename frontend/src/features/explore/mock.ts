@@ -2,7 +2,7 @@
  * MOCK DATA for the Explore screen, copied from the UI design so the layout can be built and
  * reviewed before the real data exists. Everything here is replaced by real sources later:
  *   places, ratings, photos  -> M7 place summaries (GET /api/places/{id}/summary, live from Google)
- *   pins / map               -> M2 MapView (Google Maps JS); `mapPoint` disappears with it
+ *   pins / map               -> VietMap GL JS; `mapPoint` is only a demo position until real coordinates exist
  *   featured / dishes        -> M3 match results and M4 review analysis ("dishes to try")
  * Photos live in /public/mock and are placeholders cut from the mock-up.
  */
@@ -45,7 +45,7 @@ export interface ExplorePlace {
   openNow: boolean;
 }
 
-/** The illustration is 834 x 559 px; the mock-up placed pins in that pixel space. */
+/** Normalized positions retained from the map mockup until places have real coordinates. */
 const IMG_W = 834;
 const IMG_H = 559;
 /** (cx, cy) = centre of the pin head in mock-up pixels, relative to the illustration. */
@@ -231,13 +231,6 @@ export const PLACES: ExplorePlace[] = [
 ];
 
 
-
-/** Hand-written district labels drawn on the illustration (positions in % of the image). */
-export const MAP_LABELS = [
-  { text: "Arashiyama", x: 4.2, y: 41.5, tilt: -8, arrow: true },
-  { text: "Kiyomizu-dera", x: 71.8, y: 70.6, tilt: -9, arrow: true },
-  { text: "Kamo River", x: 76, y: 92, tilt: -27, arrow: false },
-];
 
 export const EXPLORE_COPY = {
   headline: ["Discover", "Good Food,", "Near You"],
