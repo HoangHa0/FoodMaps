@@ -1,105 +1,137 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { useRequireAuth } from "@/features/auth";
+import { mapApi, VietMap } from "@/features/map";
 
-import { DEFAULT_PLACE_ID, EXPLORE_COPY, MAP_LABELS, PLACES } from "../mock";
+import { EXPLORE_COPY } from "../mock";
 import {
-  FeaturedThisWeek,
   type FilterId,
   HeroStage,
-  IllustratedMap,
-  MapPreviewCard,
-  PlaceDetailPanel,
-  PlaceList,
+  StoredPlaceDetail,
+  StoredPlaceList,
+  StoredPlacePreview,
+  StoredPlaceGrid,
 } from "./views";
 
-/** Google Maps search link by name (works without an API key; opens the app on phones). */
-const directionsUrl = (name: string) =>
-  `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query: name }).toString()}`;
+function directionsUrl(lat: number, lng: number): string {
+  const query = new URLSearchParams({ api: "1", destination: `${lat},${lng}` });
+  return `https://www.google.com/maps/dir/?${query}`;
+}
 
-/**
- * Container of the home / Explore screen. Holds UI state only (selected place, filter, list
- * view, saved hearts). Data comes from ../mock for now:
- *   TODO(M2/M3/M7): replace PLACES with real queries (map places, match results, place summaries)
- *   TODO(M2): replace the local `saved` set with the saved-places API (the login guard stays)
- */
 export function ExploreScreen() {
-  const guard = useRequireAuth(); // Save = login-only action (M1): guests get the login sheet first
+  const guard = useRequireAuth();
   const [filter, setFilter] = useState<FilterId>("nearby");
-  const [selectedId, setSelectedId] = useState<string>(DEFAULT_PLACE_ID);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listView, setListView] = useState(false);
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
-  const [savedDishes, setSavedDishes] = useState<ReadonlySet<string>>(new Set());
+  const placesQuery = useQuery({
+    queryKey: ["map", "places"],
+    queryFn: mapApi.places,
+    staleTime: 60_000,
+  });
 
   const visible = useMemo(
-    () =>
-      PLACES.filter((p) =>
-        filter === "trending" ? p.trending : filter === "open" ? p.openNow : filter === "top" ? p.rating >= 4.6 : true,
-      ),
-    [filter],
+    () => {
+      const places = placesQuery.data ?? [];
+      return filter === "top"
+        ? places.filter((place) => place.avg_rating !== null && place.avg_rating >= 4.6)
+        : places;
+    },
+    [filter, placesQuery.data],
   );
-  const featured = PLACES.filter((p) => p.featured);
-  const selected = PLACES.find((p) => p.id === selectedId) ?? PLACES[0];
+  const selected = visible.find((place) => place.place_id === selectedId) ?? visible[0];
 
-  const toggle = (set: ReadonlySet<string>, id: string) => {
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  };
-  const toggleSave = (id: string) => guard(() => setSaved((s) => toggle(s, id)));
-  const toggleDish = (id: string) => guard(() => setSavedDishes((s) => toggle(s, id)));
+  const toggleSave = (id: string) =>
+    guard(() =>
+      setSaved((current) => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    );
+
   const select = (id: string) => {
     setSelectedId(id);
     setListView(false);
   };
 
   const map = (
-    <IllustratedMap
+    <VietMap
       places={visible}
-      labels={MAP_LABELS}
-      selectedId={selectedId}
+      selectedId={selected?.place_id ?? null}
       onSelect={select}
       listView={listView}
-      onToggleList={() => setListView((v) => !v)}
-      list={<PlaceList places={visible} onSelect={select} />}
+      onToggleList={() => setListView((value) => !value)}
+      list={<StoredPlaceList places={visible} onSelect={select} />}
       preview={
-        visible.some((p) => p.id === selected.id) ? (
-          <MapPreviewCard place={selected} onOpen={() => document.getElementById("place-detail")?.scrollIntoView({ behavior: "smooth" })} />
+        selected ? (
+          <StoredPlacePreview
+            place={selected}
+            onOpen={() => document.getElementById("place-detail")?.scrollIntoView({ behavior: "smooth" })}
+          />
         ) : undefined
       }
     />
   );
 
   return (
-    // Two columns only when the hero still has room next to the 28rem panel (≈1360px+);
-    // narrower desktops show the panel under the featured row.
     <div className="grid gap-5 pb-6 min-[1360px]:grid-cols-[minmax(0,1fr)_28rem] min-[1360px]:gap-0 min-[1360px]:pb-0">
       <div className="flex min-w-0 flex-col gap-3.5 md:px-2.5 min-[1360px]:pr-0">
         <HeroStage
           headline={EXPLORE_COPY.headline}
-          subtitle={EXPLORE_COPY.subtitle}
+          subtitle="Khám phá các quán có trong dữ liệu FoodMaps."
           note={EXPLORE_COPY.note}
           filter={filter}
           onFilter={setFilter}
           map={map}
         />
-        <div className="px-4 md:px-0">
-          <FeaturedThisWeek places={featured} savedIds={saved} onToggleSave={toggleSave} onSelect={select} />
-        </div>
+        {placesQuery.isPending && (
+          <p className="px-4 text-sm text-fg-muted" role="status">
+            Đang tải danh sách quán…
+          </p>
+        )}
+        {placesQuery.isError && (
+          <p className="mx-4 rounded-card bg-surface p-4 text-sm text-danger shadow-card md:mx-0" role="alert">
+            Không tải được danh sách quán từ FoodMaps. Hãy thử tải lại trang.
+          </p>
+        )}
+        {!placesQuery.isPending && !placesQuery.isError && (
+          <div className="px-4 md:px-0">
+            <StoredPlaceGrid
+              places={visible}
+              savedIds={saved}
+              onToggleSave={toggleSave}
+              onSelect={select}
+            />
+          </div>
+        )}
       </div>
-      <aside id="place-detail" className="w-full max-w-xl justify-self-center px-4 md:px-0 min-[1360px]:max-w-none min-[1360px]:pl-5 min-[1360px]:pr-6 min-[1360px]:pt-5.5" aria-label="Selected place">
-        <PlaceDetailPanel
-          place={selected}
-          saved={saved.has(selected.id)}
-          onToggleSave={() => toggleSave(selected.id)}
-          onBack={() => setSelectedId(DEFAULT_PLACE_ID)}
-          directionsUrl={directionsUrl(selected.name)}
-          savedDishIds={savedDishes}
-          onToggleDish={toggleDish}
-        />
+
+      <aside
+        id="place-detail"
+        className="w-full max-w-xl justify-self-center px-4 md:px-0 min-[1360px]:max-w-none min-[1360px]:pl-5 min-[1360px]:pr-6 min-[1360px]:pt-5.5"
+        aria-label="Thông tin quán"
+      >
+        {selected ? (
+          <StoredPlaceDetail
+            place={selected}
+            saved={saved.has(selected.place_id)}
+            onToggleSave={() => toggleSave(selected.place_id)}
+            onBack={() => setListView(false)}
+            directionsUrl={directionsUrl(selected.lat, selected.lng)}
+          />
+        ) : (
+          !placesQuery.isPending &&
+          !placesQuery.isError && (
+            <p className="rounded-sheet bg-surface p-5 text-sm text-fg-muted shadow-sheet">
+              {filter === "top" ? "Chưa có quán nào có đánh giá từ 4.6 trở lên." : "Chưa có quán nào trong dữ liệu FoodMaps."}
+            </p>
+          )
+        )}
       </aside>
     </div>
   );

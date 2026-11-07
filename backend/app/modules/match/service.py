@@ -22,6 +22,7 @@ state: the client sends the remaining place_ids.
 
 import math
 from collections import defaultdict
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from fastapi.concurrency import run_in_threadpool
@@ -38,6 +39,7 @@ from app.modules.match.schemas import (
     DishCount,
     FaqItem,
     InsightsOut,
+    MapPlace,
     MatchResponse,
     MatchResult,
     RejectIn,
@@ -143,21 +145,51 @@ async def _names_for(db: AsyncSession, scored: list[Scored]) -> dict[str, str]:
     return {row.place_id: row.manual_name for row in rows}
 
 
-def _to_results(scored: list[Scored], tags: dict[str, list[str]], names: dict[str, str]) -> list[MatchResult]:
-    return [
-        MatchResult(
-            place_id=s.place_id,
-            name=names.get(s.place_id),
-            match_score=round(s.score, 4),
-            tags=tags[s.place_id],
-            distance_m=s.distance_m,
-            price_per_person=s.price_per_person,
-            avg_rating=None if s.avg_rating is None else round(s.avg_rating, 1),
-            review_count=s.n_reviews,
-            reasons=build_reasons(s),
+async def _public_ratings_for(db: AsyncSession, scored: list[Scored]) -> dict[str, tuple[float, int]]:
+    """Public rating display uses website reviews; ranking continues to use all visible reviews."""
+    if not scored:
+        return {}
+    rows = await db.execute(
+        select(
+            Review.place_id,
+            func.avg(
+                (Review.score_food + Review.score_space + Review.score_price + Review.score_service) / 4.0
+            ).label("avg_rating"),
+            func.count().label("review_count"),
         )
-        for s in scored
-    ]
+        .where(
+            Review.place_id.in_([place.place_id for place in scored]),
+            Review.status == "visible",
+            Review.source == "user",
+        )
+        .group_by(Review.place_id)
+    )
+    return {row.place_id: (float(row.avg_rating), int(row.review_count)) for row in rows}
+
+
+def _to_results(
+    scored: list[Scored],
+    tags: dict[str, list[str]],
+    names: dict[str, str],
+    public_ratings: dict[str, tuple[float, int]],
+) -> list[MatchResult]:
+    results = []
+    for s in scored:
+        avg_rating, review_count = public_ratings.get(s.place_id, (None, 0))
+        results.append(
+            MatchResult(
+                place_id=s.place_id,
+                name=names.get(s.place_id),
+                match_score=round(s.score, 4),
+                tags=tags[s.place_id],
+                distance_m=s.distance_m,
+                price_per_person=s.price_per_person,
+                avg_rating=round(avg_rating, 1) if avg_rating is not None else None,
+                review_count=review_count,
+                reasons=build_reasons(replace(s, avg_rating=avg_rating, n_reviews=review_count)),
+            )
+        )
+    return results
 
 
 # --------------------------------------------------------------------------- pipeline
@@ -186,7 +218,8 @@ class MatchCandidateProvider:
 
     async def _search(self, db: AsyncSession, criteria: MatchCriteria, k: int) -> list[MatchResult]:
         top = await self._scored(db, criteria, k)
-        return _to_results(top, await _tags_for(db, top), await _names_for(db, top))
+        ratings = await _public_ratings_for(db, top)
+        return _to_results(top, await _tags_for(db, top), await _names_for(db, top), ratings)
 
     async def rerank_after_reject(
         self, criteria: MatchCriteria, reason: str, rejected_place_id: str, remaining: list[str]
@@ -207,7 +240,8 @@ class MatchCandidateProvider:
         scored = await self._scored(db, criteria, len(ids), place_ids=ids)
         scored = with_crowd(scored, await _crowd_for(db, ids))
         ranked = rerank_after_reject(scored, reason, rejected_place_id=rejected_id)
-        return _to_results(ranked, await _tags_for(db, ranked), await _names_for(db, ranked))
+        ratings = await _public_ratings_for(db, ranked)
+        return _to_results(ranked, await _tags_for(db, ranked), await _names_for(db, ranked), ratings)
 
     async def _scored(
         self,
@@ -283,6 +317,52 @@ class MatchCandidateProvider:
 
 
 # --------------------------------------------------------------------------- endpoint logic
+
+
+async def list_map_places(db: AsyncSession) -> list[MapPlace]:
+    ratings = (
+        select(
+            Review.place_id.label("place_id"),
+            func.avg(
+                (Review.score_food + Review.score_space + Review.score_price + Review.score_service) / 4.0
+            ).label("avg_rating"),
+            func.count().label("review_count"),
+        )
+        .where(Review.status == "visible", Review.source == "user")
+        .group_by(Review.place_id)
+        .subquery()
+    )
+    rows = (
+        await db.execute(
+            select(
+                Place.place_id,
+                Place.manual_name,
+                Place.category,
+                Place.lat,
+                Place.lng,
+                Place.address,
+                Place.price_per_person,
+                ratings.c.avg_rating,
+                ratings.c.review_count,
+            )
+            .outerjoin(ratings, ratings.c.place_id == Place.place_id)
+            .order_by(Place.place_code)
+        )
+    ).all()
+    return [
+        MapPlace(
+            place_id=row.place_id,
+            name=row.manual_name,
+            category=row.category,
+            lat=row.lat,
+            lng=row.lng,
+            address=row.address,
+            price_per_person=row.price_per_person,
+            avg_rating=None if row.avg_rating is None else float(row.avg_rating),
+            review_count=int(row.review_count or 0),
+        )
+        for row in rows
+    ]
 
 
 def split_best_and_backups(results: list[MatchResult]) -> MatchResponse:

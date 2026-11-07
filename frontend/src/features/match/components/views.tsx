@@ -282,10 +282,15 @@ export function MatchResultSheet({
               <h2 className="font-display text-xl font-bold" data-testid="match-name">
                 {result.name ?? "Quán phù hợp nhất"}
               </h2>
-              {/* price and rating are already lines of `reasons`, shown in the Why box */}
+              {/* Price and distance remain in the Why box; the public rating is shown above. */}
               {result.distance_m != null && (
                 <p className="mt-1 text-sm text-fg-muted">Cách khoảng {formatDistance(result.distance_m)}</p>
               )}
+              <p className="mt-1 text-sm text-fg-muted">
+                {result.avg_rating != null && result.review_count > 0
+                  ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
+                  : "Chưa có đánh giá"}
+              </p>
             </div>
             <Badge tone="accent">{Math.round(result.match_score * 100)}% MATCH</Badge>
             <IconButton label="Đóng" variant="plain" icon={<IconClose className="size-5" />} onClick={onClose} />
@@ -299,7 +304,11 @@ export function MatchResultSheet({
             </div>
           )}
 
-          <WhyBox why={why} loading={whyLoading} reasons={result.reasons ?? []} />
+          <WhyBox
+            why={why}
+            loading={whyLoading}
+            reasons={(result.reasons ?? []).filter((reason) => !reason.startsWith("⭐ "))}
+          />
 
           <div className="grid grid-cols-3 gap-2">
             <a

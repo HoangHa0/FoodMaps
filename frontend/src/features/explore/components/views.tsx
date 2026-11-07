@@ -17,21 +17,14 @@ import {
   IconBack,
   IconButton,
   IconChevronRight,
-  IconClock,
   IconDirections,
   IconGroup,
   IconHeart,
-  IconList,
-  IconLocate,
-  IconMinus,
   IconOpeningHours,
   IconPayment,
   IconPin,
-  IconPlus,
   IconStar,
-  IconTrending,
   Badge,
-  MapPin,
   Mascot,
   PopLines,
   Rating,
@@ -39,14 +32,13 @@ import {
 } from "@/ui";
 
 import type { ExplorePlace } from "../mock";
+import type { MapPlace } from "@/features/map";
 
-export type FilterId = "nearby" | "trending" | "top" | "open";
+export type FilterId = "nearby" | "top";
 
 export const FILTERS: { id: FilterId; label: string; icon: ReactNode }[] = [
-  { id: "nearby", label: "Nearby", icon: <IconPin className="size-4" aria-hidden /> },
-  { id: "trending", label: "Trending", icon: <IconTrending className="size-4" aria-hidden /> },
-  { id: "top", label: "Top Rated", icon: <IconStar className="size-4" aria-hidden /> },
-  { id: "open", label: "Open Now", icon: <IconClock className="size-4" aria-hidden /> },
+  { id: "nearby", label: "Tất cả quán", icon: <IconPin className="size-4" aria-hidden /> },
+  { id: "top", label: "Đánh giá cao", icon: <IconStar className="size-4" aria-hidden /> },
 ];
 
 /** Absolute position in % of the parent: at(left, top, width?) */
@@ -108,188 +100,78 @@ export function HeroStage({
   note: string[];
   filter: FilterId;
   onFilter: (f: FilterId) => void;
-  /** The map block (illustration placeholder now, M2's Google map later). */
+  /** The map block. */
   map: ReactNode;
 }) {
   return (
-    <>
-      {/* phones / tablets: plain stacked layout */}
-      <section className="flex flex-col gap-4 px-4 pt-2 md:hidden">
-        <div className="flex items-start justify-between gap-2">
-          <HeroHeadline lines={headline} className="text-5xl" />
-          <Mascot className="mt-2 w-24" />
-        </div>
-        <p className="text-sm text-fg-muted">{subtitle}</p>
-        <FilterChips active={filter} onChange={onFilter} className="-mx-4 flex-nowrap! overflow-x-auto px-4 pb-1 [&>button]:shrink-0" />
-        {/* crop away most of the illustration's top bleed, which only makes sense behind the desktop hero */}
-        <div className="relative aspect-[834/430] w-full overflow-hidden rounded-card">
-          <div className="absolute inset-x-0 bottom-0 h-[130%]">{map}</div>
-        </div>
-      </section>
-
-      {/* desktop: the mock-up composition */}
-      <section className="@container relative hidden aspect-[833/638] w-full md:block" aria-label="Explore">
-        <div style={{ ...at(4.8, 5.4), ...fluid(6.05, 34), letterSpacing: "0.02em", transform: "rotate(-3.5deg)", transformOrigin: "left top" }}>
-          <HeroHeadline lines={headline} />
-        </div>
-        <div style={{ ...at(5.2, 24.6, 28.4), height: "2.6%" }}>
-          <BrushUnderline className="size-full" />
-        </div>
-        <div style={{ ...at(37.4, 9.6, 3.1), height: "8.4%" }}>
-          <PopLines className="size-full" />
-        </div>
-        <p className="leading-snug text-fg-muted" style={{ ...at(36.8, 26.6, 23), ...fluid(1.56, 12) }}>
-          {subtitle}
-        </p>
-
-        {/* the map sits UNDER the mascot and note: its top-right edge bleeds into the hero */}
-        <div className="absolute inset-x-0 bottom-0" style={{ top: "12.54%" }}>
-          {map}
-        </div>
-
-        <div style={{ ...at(59.4, 19.6, 3), height: "5%" }}>
-          <PopLines className="size-full" flip />
-        </div>
-        <div style={at(63.9, 7.7, 20.3)}>
-          <Mascot className="w-full" title="FoodMaps mascot" />
-        </div>
-        <div style={{ ...at(80.3, 4.1, 2.8), height: "4.5%" }}>
-          <svg viewBox="0 0 24 30" className="size-full" aria-hidden>
-            <path d="M8 3 L4 12 M20 16 L9 21" className="stroke-primary" strokeWidth="3.4" strokeLinecap="round" fill="none" />
-          </svg>
-        </div>
-        <div className="text-center" style={{ ...at(81.6, 1.8, 15), ...fluid(2.3, 14) }}>
-          <HandNote tilt={-24} className="leading-[1.05]">
-            {note.map((l) => (
-              <span key={l} className="block">
-                {l}
-              </span>
-            ))}
-          </HandNote>
-        </div>
-        <div style={{ ...at(88, 2.8, 8.4), height: "16%" }}>
-          {/* curved arrow that wraps the note */}
-          <svg viewBox="0 0 70 100" className="size-full" aria-hidden>
-            <path d="M55 4 C70 24 66 64 32 92 M32 92 L44 86 M32 92 L26 80" className="stroke-fg" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-          </svg>
-        </div>
-
-        <FilterChips
-          active={filter}
-          onChange={onFilter}
-          className="flex-nowrap"
-          // chips keep their real size; only their position follows the stage
-          style={at(3.5, 33.7)}
-        />
-      </section>
-    </>
-  );
-}
-
-// =========================================================================== illustrated map
-
-export interface MapLabel {
-  text: string;
-  x: number;
-  y: number;
-  tilt: number;
-  arrow: boolean;
-}
-
-/**
- * PLACEHOLDER MAP: a static illustration with clickable pins. M2 replaces the illustration and
- * the % positioning with <MapView> (Google Maps JS + AdvancedMarkerElement rendering <MapPin>);
- * the floating controls, preview card and "List View" button stay as they are.
- */
-export function IllustratedMap({
-  places,
-  labels,
-  selectedId,
-  onSelect,
-  preview,
-  listView,
-  onToggleList,
-  list,
-}: {
-  places: ExplorePlace[];
-  labels: MapLabel[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  preview?: ReactNode;
-  listView: boolean;
-  onToggleList: () => void;
-  list: ReactNode;
-}) {
-  return (
-    <div className="@container absolute inset-0" data-testid="explore-map">
-      <Image
-        src="/mock/map-illustration.webp"
-        alt="Illustrated map of the area"
-        fill
-        priority
-        sizes="(min-width: 768px) 60vw, 100vw"
-        className="pointer-events-none select-none object-fill"
+    <section
+      className="@container relative flex flex-col gap-4 px-4 pt-2 md:block md:aspect-[833/638] md:w-full md:px-0 md:pt-0"
+      aria-label="Explore"
+    >
+      <div className="flex items-start justify-between gap-2 md:hidden">
+        <HeroHeadline lines={headline} className="text-5xl" />
+        <Mascot className="mt-2 w-24" />
+      </div>
+      <p className="text-sm text-fg-muted md:hidden">{subtitle}</p>
+      <FilterChips
+        active={filter}
+        onChange={onFilter}
+        className="-mx-4 flex-nowrap! overflow-x-auto px-4 pb-1 md:hidden [&>button]:shrink-0"
       />
-      {!listView && (
-        <>
-          {labels.map((l) => (
-            <div key={l.text} className="pointer-events-none flex flex-col items-center" style={{ ...at(l.x, l.y), ...fluid(2.65, 14) }}>
-              <HandNote tilt={l.tilt}>{l.text}</HandNote>
-              {l.arrow && (
-                <svg viewBox="0 0 44 10" className="w-10" style={{ transform: `rotate(${l.tilt}deg)` }} aria-hidden>
-                  <path d="M3 5 H41 M3 5 L8 2 M3 5 L8 8 M41 5 L36 2 M41 5 L36 8" className="stroke-fg" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-                </svg>
-              )}
-            </div>
-          ))}
-          {places.map((p) => (
-            <div
-              key={p.id}
-              className={cn("absolute -translate-x-1/2 -translate-y-full", p.id === selectedId && "z-10")}
-              style={{ left: `${p.mapPoint.x}%`, top: `${p.mapPoint.y}%` }}
-            >
-              <MapPin
-                tone={p.pinTone}
-                kind={p.pinKind}
-                label={p.name}
-                selected={p.id === selectedId}
-                onClick={() => onSelect(p.id)}
-              />
-            </div>
-          ))}
-          {/* phones: no floating card (the detail panel sits right below the map) */}
-          {preview && (
-            <div className="hidden md:block" style={at(55.5, 35.2, 34.8)}>
-              {preview}
-            </div>
-          )}
-        </>
-      )}
-      {listView && <div className="absolute inset-x-0 bottom-0 top-[42%] overflow-y-auto rounded-b-card p-4 md:top-[34%]">{list}</div>}
 
-      <div
-        className="absolute hidden w-10 flex-col overflow-hidden rounded-control bg-surface-raised shadow-float md:flex md:w-[5%] md:min-w-10"
-        style={{ right: "0.8%", top: "26.1%" }}
-      >
-        {/* TODO(M2): wire zoom / my-location to the Google map instance */}
-        <IconButton variant="plain" label="Zoom in" icon={<IconPlus className="size-5" />} className="w-full rounded-none" />
-        <span className="mx-2 h-px bg-border" aria-hidden />
-        <IconButton variant="plain" label="Zoom out" icon={<IconMinus className="size-5" />} className="w-full rounded-none" />
-        <span className="mx-2 h-px bg-border" aria-hidden />
-        <IconButton variant="plain" label="My location" icon={<IconLocate className="size-5" />} className="w-full rounded-none" />
+      <div className="relative aspect-[834/430] w-full overflow-hidden rounded-card md:absolute md:inset-x-0 md:bottom-0 md:top-[12.54%] md:aspect-auto">
+        {map}
       </div>
 
-      <button
-        type="button"
-        onClick={onToggleList}
-        aria-pressed={listView}
-        className="absolute inline-flex h-9 items-center gap-2 rounded-control bg-surface-raised px-4 text-sm font-semibold shadow-float transition ease-standard hover:bg-primary-soft"
-        style={{ right: "1.6%", bottom: "2%" }}
+      <div
+        className="hidden md:block"
+        style={{ ...at(4.8, 5.4), ...fluid(6.05, 34), letterSpacing: "0.02em", transform: "rotate(-3.5deg)", transformOrigin: "left top" }}
       >
-        <IconList className="size-4" aria-hidden />
-        {listView ? "Map View" : "List View"}
-      </button>
-    </div>
+        <HeroHeadline lines={headline} />
+      </div>
+      <div className="hidden md:block" style={{ ...at(5.2, 24.6, 28.4), height: "2.6%" }}>
+        <BrushUnderline className="size-full" />
+      </div>
+      <div className="hidden md:block" style={{ ...at(37.4, 9.6, 3.1), height: "8.4%" }}>
+        <PopLines className="size-full" />
+      </div>
+      <p className="hidden leading-snug text-fg-muted md:block" style={{ ...at(36.8, 26.6, 23), ...fluid(1.56, 12) }}>
+        {subtitle}
+      </p>
+
+      <div className="hidden md:block" style={{ ...at(59.4, 19.6, 3), height: "5%" }}>
+        <PopLines className="size-full" flip />
+      </div>
+      <div className="hidden md:block" style={at(63.9, 7.7, 20.3)}>
+        <Mascot className="w-full" title="FoodMaps mascot" />
+      </div>
+      <div className="hidden md:block" style={{ ...at(80.3, 4.1, 2.8), height: "4.5%" }}>
+        <svg viewBox="0 0 24 30" className="size-full" aria-hidden>
+          <path d="M8 3 L4 12 M20 16 L9 21" className="stroke-primary" strokeWidth="3.4" strokeLinecap="round" fill="none" />
+        </svg>
+      </div>
+      <div className="hidden text-center md:block" style={{ ...at(81.6, 1.8, 15), ...fluid(2.3, 14) }}>
+        <HandNote tilt={-24} className="leading-[1.05]">
+          {note.map((line) => (
+            <span key={line} className="block">
+              {line}
+            </span>
+          ))}
+        </HandNote>
+      </div>
+      <div className="hidden md:block" style={{ ...at(88, 2.8, 8.4), height: "16%" }}>
+        <svg viewBox="0 0 70 100" className="size-full" aria-hidden>
+          <path d="M55 4 C70 24 66 64 32 92 M32 92 L44 86 M32 92 L26 80" className="stroke-fg" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        </svg>
+      </div>
+
+      <FilterChips
+        active={filter}
+        onChange={onFilter}
+        className="hidden flex-nowrap md:flex"
+        style={at(3.5, 33.7)}
+      />
+    </section>
   );
 }
 
@@ -315,6 +197,175 @@ export function MapPreviewCard({ place, onOpen }: { place: ExplorePlace; onOpen:
       </span>
       <IconChevronRight className="size-4 shrink-0 text-fg-muted" aria-hidden />
     </button>
+  );
+}
+
+export function StoredPlacePreview({ place, onOpen }: { place: MapPlace; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-3 text-left shadow-float transition ease-standard hover:-translate-y-0.5"
+      data-testid="map-preview"
+    >
+      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
+        {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="truncate text-sm font-bold text-fg">{place.name}</span>
+        <span className="truncate text-xs text-fg-muted">{place.category}</span>
+        {place.avg_rating !== null && place.review_count > 0 ? (
+          <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} size="sm" />
+        ) : (
+          <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
+        )}
+      </span>
+      <IconChevronRight className="size-4 shrink-0 text-fg-muted" aria-hidden />
+    </button>
+  );
+}
+
+export function StoredPlaceList({ places, onSelect }: { places: MapPlace[]; onSelect: (id: string) => void }) {
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2">
+      {places.map((place) => (
+        <li key={place.place_id}>
+          <button
+            type="button"
+            onClick={() => onSelect(place.place_id)}
+            className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-3 text-left shadow-card hover:bg-primary-soft"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
+              {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="truncate text-sm font-bold">{place.name}</span>
+              <span className="truncate text-xs text-fg-muted">{place.category}</span>
+            </span>
+            {place.avg_rating !== null && place.review_count > 0 ? (
+              <Rating value={place.avg_rating} size="sm" />
+            ) : (
+              <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
+            )}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function StoredPlaceGrid({
+  places,
+  savedIds,
+  onToggleSave,
+  onSelect,
+}: {
+  places: MapPlace[];
+  savedIds: ReadonlySet<string>;
+  onToggleSave: (id: string) => void;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section className="rounded-card bg-surface px-4 pb-4 pt-3 shadow-card md:px-7" aria-label="Quán trong FoodMaps">
+      <SectionTitle title="Quán trong FoodMaps" action={`${places.length} quán`} />
+      {places.length === 0 ? (
+        <p className="py-6 text-center text-sm text-fg-muted">Chưa có quán nào trong khu vực dữ liệu.</p>
+      ) : (
+        <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {places.map((place) => (
+            <li key={place.place_id} className="relative rounded-xl bg-surface-raised p-3 shadow-card">
+              <button type="button" onClick={() => onSelect(place.place_id)} className="flex w-full items-center gap-3 pr-9 text-left">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
+                  {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
+                </span>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-sm font-semibold text-fg">{place.name}</span>
+                  <span className="truncate text-xs text-fg-muted">{place.category}</span>
+                  {place.avg_rating !== null ? (
+                    <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} size="sm" />
+                  ) : (
+                    <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
+                  )}
+                </span>
+              </button>
+              <SaveButton
+                saved={savedIds.has(place.place_id)}
+                onToggle={() => onToggleSave(place.place_id)}
+                filled
+                className="absolute right-2 top-2"
+                size="sm"
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function StoredPlaceDetail({
+  place,
+  saved,
+  onToggleSave,
+  onBack,
+  directionsUrl,
+}: {
+  place: MapPlace;
+  saved: boolean;
+  onToggleSave: () => void;
+  onBack: () => void;
+  directionsUrl: string;
+}) {
+  return (
+    <article className="overflow-hidden rounded-sheet bg-surface p-5 shadow-sheet" data-testid="place-detail" aria-label={place.name}>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary-soft text-2xl" aria-hidden>
+            {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-xl font-extrabold leading-tight text-fg">{place.name}</h2>
+            <p className="mt-1 text-sm text-fg-muted">{place.category}</p>
+          </div>
+        </div>
+        <SaveButton saved={saved} onToggle={onToggleSave} />
+      </header>
+
+      <div className="mt-4 flex flex-col gap-3 text-sm text-fg-muted">
+        {place.avg_rating !== null ? (
+          <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} />
+        ) : (
+          <span>Chưa có đánh giá</span>
+        )}
+        {place.address && (
+          <p>
+            <span className="font-semibold text-fg">Địa chỉ: </span>
+            {place.address}
+          </p>
+        )}
+        {place.price_per_person !== null && (
+          <p>
+            <span className="font-semibold text-fg">Giá tham khảo: </span>
+            {new Intl.NumberFormat("vi-VN").format(place.price_per_person)}đ/người
+          </p>
+        )}
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <button type="button" onClick={onBack} className="h-11 rounded-control bg-surface-raised font-semibold text-fg hover:bg-primary-soft">
+          Quay lại bản đồ
+        </button>
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-control bg-primary font-bold text-primary-fg shadow-card hover:brightness-95"
+        >
+          <IconDirections className="size-4.5 fill-fg" aria-hidden />
+          Chỉ đường
+        </a>
+      </div>
+    </article>
   );
 }
 
