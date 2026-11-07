@@ -3,6 +3,8 @@
 Final score = weighted average of four components, each in 0..1:
 
     semantic  how close the place's embedding is to the mood (cosine similarity, calibrated)
+    facet     how many reviewers' tags answer the wishes found in the mood (see facets.py); skipped
+              when the mood has no known wish
     distance  1 at the origin, 0 at the edge of the radius (skipped when there is no origin)
     rating    average of our own reviews, shrunk towards a neutral prior
     budget    1 when the price is inside [price_min, price_max] (skipped when no budget is given).
@@ -22,14 +24,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 
 # --- weights (relative; they are re-normalised) -------------
-W_SEMANTIC = 0.55
-W_DISTANCE = 0.20
-W_RATING = 0.15
+W_SEMANTIC = 0.45
+W_FACET = 0.30
+W_DISTANCE = 0.15
+W_RATING = 0.10
 W_BUDGET = 0.10
 
 # --- semantic calibration ---------------------------------------------------------------------
-# paraphrase-multilingual-MiniLM cosine for a relevant place is typically 0.2-0.6, so it cannot be
-# shown as a percentage directly. Values <= SIM_LOW map to 0 and >= SIM_HIGH map to 1.
+# A raw cosine cannot be shown as a percentage, so it is mapped to 0..1: values <= low give 0 and
+# values >= high give 1. Each embedding model has its own range, so the real values live in the model
+# profile (embedding.py) and the service passes them to `score_candidates`.
+# The two numbers below are only the DEFAULTS for callers that pass nothing (the unit tests). They are
+# the paraphrase-multilingual-MiniLM range; do not change them when you change the model.
 SIM_LOW = 0.15
 SIM_HIGH = 0.60
 
@@ -66,8 +72,9 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(a))
 
 
-def semantic_score(cosine: float) -> float:
-    return clamp01((cosine - SIM_LOW) / (SIM_HIGH - SIM_LOW))
+def semantic_score(cosine: float, low: float = SIM_LOW, high: float = SIM_HIGH) -> float:
+    """`low`/`high` come from the active embedding model (see embedding.py): each model has its own range."""
+    return clamp01((cosine - low) / (high - low))
 
 
 def distance_score(distance_m: float, radius_m: int) -> float:
@@ -106,6 +113,7 @@ def budget_score(price: int | None, price_min: int | None, price_max: int | None
 def combine(components: dict[str, float | None]) -> float:
     weights = {
         "semantic": W_SEMANTIC,
+        "facet": W_FACET,
         "distance": W_DISTANCE,
         "rating": W_RATING,
         "budget": W_BUDGET,
@@ -129,6 +137,7 @@ class RawCandidate:
     avg_rating: float | None  # mean of the 4 review scores, None when there is no review
     n_reviews: int
     crowd: float | None = None  # 0 (quiet) .. 1 (packed); only filled for the reject rerank
+    facet: float | None = None  # 0..1 from the reviewers' tags; None = the mood has no known wish
 
 
 @dataclass(frozen=True)
@@ -151,6 +160,8 @@ def score_candidates(
     price_min: int | None,
     price_max: int | None,
     k: int,
+    sim_low: float = SIM_LOW,
+    sim_high: float = SIM_HIGH,
 ) -> list[Scored]:
     """Apply the hard filters (radius, budget), score the survivors, return the best k."""
     scored: list[Scored] = []
@@ -160,7 +171,8 @@ def score_candidates(
         if not budget_allowed(r.price_per_person, price_min, price_max):
             continue
         components = {
-            "semantic": semantic_score(r.similarity),
+            "semantic": semantic_score(r.similarity, sim_low, sim_high),
+            "facet": r.facet,
             "distance": None if r.distance_m is None else distance_score(r.distance_m, radius_m),
             "rating": rating_score(r.avg_rating, r.n_reviews),
             "budget": budget_score(r.price_per_person, price_min, price_max),
