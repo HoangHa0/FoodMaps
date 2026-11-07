@@ -4,28 +4,16 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useRequireAuth } from "@/features/auth";
-<<<<<<< Updated upstream
 import { mapApi, VietMap } from "@/features/map";
 
 import { EXPLORE_COPY } from "../mock";
-=======
-import { MapMarker, MapView } from "@/features/map"; // 👈 Import MapView và MapMarker từ module map của bạn
-
-import { DEFAULT_PLACE_ID, EXPLORE_COPY, PLACES } from "../mock";
->>>>>>> Stashed changes
 import {
   type FilterId,
   HeroStage,
-<<<<<<< Updated upstream
   StoredPlaceDetail,
   StoredPlaceList,
   StoredPlacePreview,
   StoredPlaceGrid,
-=======
-  MapPreviewCard,
-  PlaceDetailPanel,
-  PlaceList,
->>>>>>> Stashed changes
 } from "./views";
 
 function directionsUrl(lat: number, lng: number): string {
@@ -33,12 +21,6 @@ function directionsUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps/dir/?${query}`;
 }
 
-<<<<<<< Updated upstream
-=======
-/**
- * Container of the home / Explore screen.
- */
->>>>>>> Stashed changes
 export function ExploreScreen() {
   const guard = useRequireAuth();
   const [filter, setFilter] = useState<FilterId>("nearby");
@@ -72,38 +54,12 @@ export function ExploreScreen() {
       }),
     );
 
-<<<<<<< Updated upstream
-=======
-  // 👈 Chuyển đổi dữ liệu danh sách quán thành dạng MapMarker cho MapView
-  const mapMarkers: MapMarker[] = useMemo(
-    () =>
-      visible.map((place) => ({
-        id: place.id,
-        lngLat: [place.lng, place.lat],
-        icon: place.categoryIcon || "📍",
-        label: place.name,
-        variant: saved.has(place.id) ? "saved" : "match",
-      })),
-    [visible, saved],
-  );
-
-  const toggle = (set: ReadonlySet<string>, id: string) => {
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  };
-  const toggleSave = (id: string) => guard(() => setSaved((s) => toggle(s, id)));
-  const toggleDish = (id: string) => guard(() => setSavedDishes((s) => toggle(s, id)));
->>>>>>> Stashed changes
   const select = (id: string) => {
     setSelectedId(id);
     setListView(false);
   };
 
-  // 👈 Dùng MapView thật (VietMap GL JS) thay thế cho IllustratedMap
   const map = (
-<<<<<<< Updated upstream
     <VietMap
       places={visible}
       selectedId={selected?.place_id ?? null}
@@ -120,24 +76,6 @@ export function ExploreScreen() {
         ) : undefined
       }
     />
-=======
-    <div className="relative w-full h-[500px] overflow-hidden rounded-2xl border border-gray-200">
-      <MapView
-        markers={mapMarkers}
-        onMarkerClick={(marker) => select(marker.id)}
-      />
-
-      {/* Preview Card hiển thị ở góc dưới khi chọn quán */}
-      {visible.some((p) => p.id === selected.id) && (
-        <div className="absolute bottom-4 left-4 right-4 z-10 max-w-sm">
-          <MapPreviewCard
-            place={selected}
-            onOpen={() => document.getElementById("place-detail")?.scrollIntoView({ behavior: "smooth" })}
-          />
-        </div>
-      )}
-    </div>
->>>>>>> Stashed changes
   );
 
   return (
