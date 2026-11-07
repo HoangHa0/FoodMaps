@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 
-// Self-hosted fonts (@fontsource): no request to Google Fonts at runtime or build time.
-// Each CSS file declares @font-face with unicode-range, so browsers download only the subsets
-// a page actually uses (e.g. Mali's Vietnamese glyphs for headings with diacritics).
 import "@fontsource/nunito-sans/400.css";
 import "@fontsource/nunito-sans/600.css";
 import "@fontsource/nunito-sans/700.css";
@@ -26,6 +24,19 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="vi" data-theme={ACTIVE_THEME} className="h-full antialiased">
+      <head>
+        {/* Nạp VietMap GL CSS */}
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.css"
+        />
+        {/* Nạp VietMap GL JS SDK */}
+        <Script
+          id="vietmap-gl-js"
+          src="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.js"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           <AppShell>{children}</AppShell>
