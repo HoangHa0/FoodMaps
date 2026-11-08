@@ -317,6 +317,7 @@ The defaults work for local development; API keys are only needed by the feature
 | `backend/.env`        | `DATABASE_URL`                                                 | PostgreSQL connection (defaults to the Docker database)                          |
 |                       | `JWT_SECRET`                                                   | Secret for signing login tokens:**change it** outside local development          |
 |                       | `GOOGLE_MAPS_API_KEY`                                          | Google Places API (server side)                                                  |
+|                       | `VIETMAP_API_KEY`                                              | VietMap Autocomplete + Place APIs for the "search another area" field (server)   |
 |                       | `GEMINI_API_KEY`                                               | Gemini API for review analysis                                                   |
 |                       | `GROQ_API_KEY`                                                 | Groq API for the offline insights job (`scripts/generate_insights.py`)           |
 |                       | `GROQ_MODEL`                                                   | Model of that job (default `openai/gpt-oss-120b`; fallback `openai/gpt-oss-20b`) |
