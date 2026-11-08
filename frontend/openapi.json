@@ -457,6 +457,41 @@
         "title": "MapPlace",
         "type": "object"
       },
+      "MapPlaceOut": {
+        "description": "One pin on the home map: only what is needed to draw and select it.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "description": "the team's own name (places.manual_name)",
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "title": "MapPlaceOut",
+        "type": "object"
+      },
       "MatchCriteria": {
         "description": "Search criteria shared by AI Match, Group Session and Food Journey.",
         "properties": {
@@ -672,6 +707,83 @@
           "votes_cast"
         ],
         "title": "ParticipantOut",
+        "type": "object"
+      },
+      "PlaceSummaryOut": {
+        "description": "Basic facts about one place, for the place panel and for cards in other features.\n\nRatings and review summaries are not here: they come from M4 (`/api/reviews/analysis/{place_id}`)\nand M3 (`/api/match/{place_id}/insights`).",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "google_maps_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "link for the 'open in Google Maps' button",
+            "title": "Google Maps Url"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "description": "the team's own name (places.manual_name)",
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "VND per person",
+            "title": "Price Per Person"
+          },
+          "tiktok_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tiktok Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "title": "PlaceSummaryOut",
         "type": "object"
       },
       "RegisterIn": {
@@ -2256,6 +2368,80 @@
         "summary": "Why",
         "tags": [
           "M3 match"
+        ]
+      }
+    },
+    "/api/places/map": {
+      "get": {
+        "description": "Every place reduced to what the home map needs to draw a pin.",
+        "operationId": "map_places_api_places_map_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MapPlaceOut"
+                  },
+                  "title": "Response Map Places Api Places Map Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Map Places",
+        "tags": [
+          "M7 google places"
+        ]
+      }
+    },
+    "/api/places/{place_id}/summary": {
+      "get": {
+        "description": "Basic facts about one place (404 `not_found` when the id is unknown).",
+        "operationId": "place_summary_api_places__place_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Summary",
+        "tags": [
+          "M7 google places"
         ]
       }
     },
