@@ -6,7 +6,7 @@
  */
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-import { type PositionState, useCurrentPosition } from "@/lib/geolocation";
+import { type Origin, OriginPicker } from "@/features/places";
 import {
   Badge,
   Button,
@@ -18,7 +18,6 @@ import {
   IconDirections,
   IconFilters,
   IconHeart,
-  IconLocate,
   IconNotMatch,
   IconSearch,
   IconSparkles,
@@ -37,7 +36,6 @@ import {
   EMPTY_MESSAGE_AFTER,
   MOOD_CHIPS,
   RADII,
-  radiusLabel,
   REJECT_REASONS,
 } from "../lib/options";
 
@@ -67,13 +65,16 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
 /** Full-screen search: mood sentence, quick chips, options (area, budget), big CTA. */
 export function MatchOverlay({
   initial,
+  initialOrigin,
   onSubmit,
   onClose,
   loading,
   error,
 }: {
   initial?: MatchCriteria;
-  onSubmit: (c: MatchCriteria) => void;
+  /** The starting point of the previous search, so reopening the overlay keeps it. */
+  initialOrigin?: Origin | null;
+  onSubmit: (c: MatchCriteria, origin: Origin | null) => void;
   onClose: () => void;
   loading?: boolean;
   error?: string;
@@ -81,9 +82,9 @@ export function MatchOverlay({
   const [mood, setMood] = useState(initial?.mood ?? "");
   const [budget, setBudget] = useState(budgetIndex(initial?.price_min, initial?.price_max));
   const [radius, setRadius] = useState(initial?.radius_m ?? DEFAULT_RADIUS);
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const { position, request, clear } = useCurrentPosition();
-  const origin = position.status === "ok" ? position.point : null;
+  const [origin, setOrigin] = useState<Origin | null>(initialOrigin ?? null);
+  // open from the start when an area is already chosen, so the active filter is visible
+  const [optionsOpen, setOptionsOpen] = useState(!!initialOrigin);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -97,7 +98,10 @@ export function MatchOverlay({
     e?.preventDefault();
     if (!mood.trim() || loading) return;
     const b = BUDGETS[budget];
-    onSubmit({ mood: mood.trim(), origin, radius_m: radius, price_min: b.min, price_max: b.max, categories: [] });
+    onSubmit(
+      { mood: mood.trim(), origin: origin?.point ?? null, radius_m: radius, price_min: b.min, price_max: b.max, categories: [] },
+      origin,
+    );
   }
 
   // Enter searches, Shift+Enter adds a new line
@@ -152,12 +156,12 @@ export function MatchOverlay({
           </Button>
           {optionsOpen && (
             <div className="mt-3 flex flex-col gap-4">
-              <AreaOptions
-                position={position}
-                hasOrigin={!!origin}
-                onToggle={() => (origin ? clear() : request())}
+              <OriginPicker
+                value={origin}
+                onChange={setOrigin}
                 radius={radius}
-                onRadius={setRadius}
+                onRadiusChange={setRadius}
+                radii={RADII}
               />
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-semibold">Khoảng giá mỗi người</legend>
@@ -182,47 +186,6 @@ export function MatchOverlay({
   );
 }
 
-function AreaOptions({
-  position,
-  hasOrigin,
-  onToggle,
-  radius,
-  onRadius,
-}: {
-  position: PositionState;
-  hasOrigin: boolean;
-  onToggle: () => void;
-  radius: number;
-  onRadius: (m: number) => void;
-}) {
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-semibold">Điểm xuất phát & bán kính</legend>
-      <div className="flex flex-wrap gap-2">
-        <Chip
-          selected={hasOrigin}
-          icon={<IconLocate className="size-4" aria-hidden />}
-          onClick={onToggle}
-          disabled={position.status === "loading"}
-        >
-          {position.status === "loading" ? "Đang lấy vị trí…" : "Vị trí của tôi"}
-        </Chip>
-        {hasOrigin &&
-          RADII.map((r) => (
-            <Chip key={r} selected={radius === r} onClick={() => onRadius(r)}>
-              {radiusLabel(r)}
-            </Chip>
-          ))}
-      </div>
-      {position.status === "error" ? (
-        <p className="text-sm text-warning">{position.message}</p>
-      ) : (
-        !hasOrigin && <p className="text-sm text-fg-muted">Không chọn: tìm ở mọi khu vực.</p>
-      )}
-    </fieldset>
-  );
-}
-
 // --------------------------------------------------------------------------- result sheet
 
 /** Bottom sheet over the map: one place + why + actions (spec 1.3). */
@@ -233,6 +196,7 @@ export function MatchResultSheet({
   why,
   whyLoading,
   directionsUrl,
+  originLabel,
   onClose,
   onSearchAgain,
   onReject,
@@ -246,6 +210,8 @@ export function MatchResultSheet({
   why: WhyOut | undefined;
   whyLoading: boolean;
   directionsUrl: string;
+  /** Name of the chosen starting point when it is not the user's own position ("Cầu Giấy"). */
+  originLabel?: string;
   onClose: () => void;
   onSearchAgain: () => void;
   onReject: (reason: RejectReason) => void;
@@ -290,7 +256,11 @@ export function MatchResultSheet({
                   The Why box keeps the price; it does not repeat the distance or the rating. */}
               <p className="mt-1 text-sm text-fg-muted" data-testid="match-meta">
                 {[
-                  result.distance_m != null ? `📍 Cách ${formatDistance(result.distance_m)}` : null,
+                  result.distance_m != null
+                    ? originLabel
+                      ? `📍 ${formatDistance(result.distance_m)} từ ${originLabel}`
+                      : `📍 Cách ${formatDistance(result.distance_m)}`
+                    : null,
                   result.avg_rating != null && result.review_count > 0
                     ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
                     : "Chưa có đánh giá",
