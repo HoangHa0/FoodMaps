@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import type { Origin } from "@/features/places";
 import { ReviewForm } from "@/features/reviews";
 import { Sheet } from "@/ui";
 
@@ -29,8 +30,8 @@ export function MatchSearch() {
   const openOverlay = useCallback(() => setOverlayOpen(true), []);
   const closeOverlay = useCallback(() => setOverlayOpen(false), []);
 
-  function submit(criteria: MatchCriteria) {
-    search.mutate(criteria, {
+  function submit(criteria: MatchCriteria, origin: Origin | null) {
+    search.mutate({ criteria, origin }, {
       onSuccess: () => {
         setOverlayOpen(false);
         if (pathname !== "/") router.push("/"); // the result floats over the map
@@ -45,6 +46,7 @@ export function MatchSearch() {
       {overlayOpen && (
         <MatchOverlay
           initial={session?.criteria}
+          initialOrigin={session?.origin}
           onSubmit={submit}
           onClose={closeOverlay}
           loading={search.isPending}
@@ -60,6 +62,8 @@ export function MatchSearch() {
           why={why.data}
           whyLoading={why.isLoading}
           directionsUrl={best ? directionsUrl(best.place_id, best.name) : ""}
+          // distances are measured from the chosen point: name it unless it is the user's own position
+          originLabel={session.origin && session.origin.source !== "gps" ? session.origin.label : undefined}
           onClose={close}
           onSearchAgain={openOverlay}
           onReject={rejectCurrent}
