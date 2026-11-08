@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   IconButton,
@@ -11,22 +11,13 @@ import {
   IconPlus,
 } from "@/ui";
 import type { MapPlace } from "./api";
+import { readToken, usePlacesLayer } from "./hooks/usePlacesLayer";
+import type { PlacesLayerOptions, PlacesMap } from "./lib/placesLayer";
 
 const TILE_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILE_KEY;
 const SCRIPT_URL = "https://unpkg.com/@vietmap/vietmap-gl-js@6.0.0/dist/vietmap-gl.js";
 const STYLE_URL = "https://unpkg.com/@vietmap/vietmap-gl-js@6.0.0/dist/vietmap-gl.css";
 const INITIAL_CENTER: [number, number] = [105.8342, 21.0278];
-
-interface VietMapPopup {
-  setDOMContent(element: HTMLElement): VietMapPopup;
-}
-
-interface VietMapMarker {
-  setLngLat(coordinates: [number, number]): VietMapMarker;
-  setPopup(popup: VietMapPopup): VietMapMarker;
-  addTo(map: VietMapInstance): VietMapMarker;
-  remove(): void;
-}
 
 interface VietMapInstance {
   on(event: "style.load", callback: () => void): void;
@@ -50,8 +41,6 @@ interface VietMapGL {
     center: [number, number];
     zoom: number;
   }) => VietMapInstance;
-  Marker: new (options: { element: HTMLElement; anchor: "bottom" }) => VietMapMarker;
-  Popup: new (options: { offset: number; closeButton: boolean }) => VietMapPopup;
   NavigationControl: new (options: { showCompass: boolean }) => unknown;
 }
 
@@ -100,91 +89,24 @@ function loadVietMap(): Promise<VietMapGL> {
   return pending;
 }
 
-function coordinates(place: MapPlace): [number, number] {
-  return [place.lng, place.lat];
-}
-
-function createPin(place: MapPlace, selected: boolean): HTMLButtonElement {
-  const pin = document.createElement("button");
-  pin.type = "button";
-  pin.setAttribute("aria-label", place.name);
-  pin.className = `grid size-10 place-items-center rounded-full border-2 border-white text-xl shadow-float ${
-    selected ? "bg-primary" : "bg-surface-raised"
-  }`;
-  const emoji = document.createElement("span");
-  emoji.textContent = /cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️";
-  pin.append(emoji);
-  return pin;
-}
-
-function createPopupContent(
-  place: MapPlace,
-  coordinates: [number, number],
-  onSelect: () => void,
-): HTMLElement {
-  const content = document.createElement("div");
-  content.className = "grid min-w-40 gap-2 text-sm text-fg";
-
-  const title = document.createElement("strong");
-  title.className = "font-bold";
-  title.textContent = place.name;
-  content.append(title);
-
-  const category = document.createElement("span");
-  category.className = "text-fg-muted";
-  category.textContent = place.category;
-  content.append(category);
-  if (place.address) {
-    const address = document.createElement("span");
-    address.className = "text-fg-muted";
-    address.textContent = place.address;
-    content.append(address);
-  }
-  if (place.avg_rating !== null && place.review_count > 0) {
-    const rating = document.createElement("span");
-    rating.className = "text-fg-muted";
-    rating.textContent = `★ ${place.avg_rating.toFixed(1)} (${place.review_count} đánh giá)`;
-    content.append(rating);
-  } else {
-    const rating = document.createElement("span");
-    rating.className = "text-fg-muted";
-    rating.textContent = "Chưa có đánh giá";
-    content.append(rating);
-  }
-
-  const details = document.createElement("button");
-  details.type = "button";
-  details.className = "w-fit cursor-pointer border-0 bg-transparent p-0 text-left text-primary hover:underline";
-  details.textContent = "Xem chi tiết";
-  details.addEventListener("click", onSelect);
-  content.append(details);
-
-  const directions = document.createElement("a");
-  const query = new URLSearchParams({
-    api: "1",
-    destination: `${coordinates[1]},${coordinates[0]}`,
-  });
-  directions.href = `https://www.google.com/maps/dir/?${query}`;
-  directions.target = "_blank";
-  directions.rel = "noopener";
-  directions.className = "w-fit text-primary hover:underline";
-  directions.textContent = "Chỉ đường";
-  content.append(directions);
-  return content;
-}
-
 export function VietMap({
   places,
   selectedId,
   onSelect,
+  onBackgroundClick,
+  savedIds,
   preview,
   listView,
   onToggleList,
   list,
 }: {
   places: MapPlace[];
+  /** The place the user picked (not a default). Changing it flies the map to that place. */
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Click on empty map. */
+  onBackgroundClick?: () => void;
+  savedIds?: ReadonlySet<string>;
   preview?: React.ReactNode;
   listView: boolean;
   onToggleList: () => void;
@@ -192,16 +114,18 @@ export function VietMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<VietMapInstance | null>(null);
-  const markersRef = useRef<VietMapMarker[]>([]);
   const hasFitPlacesRef = useRef(false);
   const onSelectRef = useRef(onSelect);
+  const onBackgroundClickRef = useRef(onBackgroundClick);
   const [loaded, setLoaded] = useState(false);
+  const [placesMap, setPlacesMap] = useState<PlacesMap | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
-  }, [onSelect]);
+    onBackgroundClickRef.current = onBackgroundClick;
+  }, [onSelect, onBackgroundClick]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -227,6 +151,8 @@ export function VietMap({
           if (active) {
             instance?.resize();
             setLoaded(true);
+            // The real SDK object has every method PlacesMap needs; our local type lists fewer.
+            setPlacesMap(instance as unknown as PlacesMap);
           }
         });
         instance.on("error", () => {
@@ -248,50 +174,56 @@ export function VietMap({
     return () => {
       active = false;
       observer.disconnect();
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
-      instance?.remove();
-      mapRef.current = null;
-      setLoaded(false);
+
+      if (mapRef.current === instance) {
+        mapRef.current = null;
+      }
+
+      if (instance) {
+        instance.remove();
+      }
     };
   }, [retry]);
 
+  // Fit the first non-empty list of places once.
   useEffect(() => {
     const instance = mapRef.current;
-    const vietmapgl = window.vietmapgl;
-    if (!loaded || !instance || !vietmapgl) return;
+    if (!loaded || !instance || places.length === 0 || hasFitPlacesRef.current) return;
+    const longitudes = places.map((place) => place.lng);
+    const latitudes = places.map((place) => place.lat);
+    instance.fitBounds(
+      [
+        [Math.min(...longitudes), Math.min(...latitudes)],
+        [Math.max(...longitudes), Math.max(...latitudes)],
+      ],
+      { padding: 48, maxZoom: 15 },
+    );
+    hasFitPlacesRef.current = true;
+  }, [loaded, places]);
 
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = places.map((place) => {
-      const location = coordinates(place);
-      const marker = new vietmapgl.Marker({
-        element: createPin(place, place.place_id === selectedId),
-        anchor: "bottom",
-      });
-      const selectPlace = () => onSelectRef.current(place.place_id);
-      const popup = new vietmapgl.Popup({ offset: 24, closeButton: true }).setDOMContent(
-        createPopupContent(place, location, selectPlace),
-      );
-      return marker.setLngLat(location).setPopup(popup).addTo(instance);
-    });
-    if (places.length > 0 && !hasFitPlacesRef.current) {
-      const longitudes = places.map((place) => place.lng);
-      const latitudes = places.map((place) => place.lat);
-      instance.fitBounds(
-        [
-          [Math.min(...longitudes), Math.min(...latitudes)],
-          [Math.max(...longitudes), Math.max(...latitudes)],
-        ],
-        { padding: 48, maxZoom: 15 },
-      );
-      hasFitPlacesRef.current = true;
-    }
+  // Stable callbacks: the layer is rebuilt whenever `layerOptions` changes.
+  const handleSelect = useCallback((id: string) => onSelectRef.current(id), []);
+  const handleBackground = useCallback(() => onBackgroundClickRef.current?.(), []);
 
-    return () => {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
-    };
-  }, [loaded, places, selectedId]);
+  // Colours come from the design tokens (names follow the Tailwind classes used in this file).
+  const layerOptions = useMemo<PlacesLayerOptions>(
+    () => ({
+      pinColors: {
+        fill: {
+          default: readToken("--color-surface-raised"),
+          saved: readToken("--color-primary-soft"),
+          selected: readToken("--color-primary"),
+        },
+        stroke: readToken("--color-surface"),
+      },
+      textColors: { text: readToken("--color-fg"), halo: readToken("--color-surface-raised") },
+      onSelect: handleSelect,
+      onBackgroundClick: handleBackground,
+    }),
+    [handleSelect, handleBackground],
+  );
+
+  usePlacesLayer({ map: placesMap, places, selectedId, savedIds, options: layerOptions });
 
   function locate() {
     if (!navigator.geolocation) {
@@ -349,20 +281,17 @@ export function VietMap({
         <IconButton variant="plain" label="My location" icon={<IconLocate className="size-5" />} className="w-full rounded-none" onClick={locate} />
       </div>
 
+      {/* bottom-9, not bottom-3: the map's own attribution sits in the bottom corner and must stay visible */}
       <button
         type="button"
         onClick={onToggleList}
         aria-pressed={listView}
-        className="absolute bottom-3 right-3 z-20 inline-flex h-9 items-center gap-2 rounded-control bg-surface-raised px-4 text-sm font-semibold shadow-float transition ease-standard hover:bg-primary-soft"
+        className="absolute bottom-9 right-3 z-20 inline-flex h-9 items-center gap-2 rounded-control bg-surface-raised px-4 text-sm font-semibold shadow-float transition ease-standard hover:bg-primary-soft"
       >
         <IconList className="size-4" aria-hidden />
         {listView ? "Map View" : "List View"}
         <IconChevronRight className={listView ? "size-4 rotate-90" : "size-4 -rotate-90"} aria-hidden />
       </button>
-
-      <span className="absolute bottom-3 left-3 z-10 rounded bg-surface-raised/90 px-2 py-1 text-xs text-fg-muted shadow-card">
-        Vị trí quán minh họa · Dữ liệu demo
-      </span>
     </div>
   );
 }

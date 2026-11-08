@@ -62,8 +62,10 @@ export function ExploreScreen() {
   const map = (
     <VietMap
       places={visible}
-      selectedId={selected?.place_id ?? null}
+      selectedId={selectedId}          // trước: selected?.place_id ?? null
       onSelect={select}
+      onBackgroundClick={() => setSelectedId(null)}
+      savedIds={saved}
       listView={listView}
       onToggleList={() => setListView((value) => !value)}
       list={<StoredPlaceList places={visible} onSelect={select} />}
