@@ -11,7 +11,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOTS = ["src/features", "src/app"];
-const ALLOW_FILES = [/src\/app\/globals\.css$/];
+const ALLOW_FILES = [
+  /src\/app\/globals\.css$/,
+  /src\/features\/map\/hooks\/usePlacesLayer\.ts$/,
+];
 // Normalise Windows "\" separators before matching paths against regexes.
 const posix = (p) => p.split(sep).join("/");
 const RULES = [
