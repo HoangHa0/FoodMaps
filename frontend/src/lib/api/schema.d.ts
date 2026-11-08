@@ -330,6 +330,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/places/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Map Places
+         * @description Every place reduced to what the home map needs to draw a pin.
+         */
+        get: operations["map_places_api_places_map_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/places/{place_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Place Summary
+         * @description Basic facts about one place (404 `not_found` when the id is unknown).
+         */
+        get: operations["place_summary_api_places__place_id__summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reviews": {
         parameters: {
             query?: never;
@@ -648,6 +688,25 @@ export interface components {
             review_count: number;
         };
         /**
+         * MapPlaceOut
+         * @description One pin on the home map: only what is needed to draw and select it.
+         */
+        MapPlaceOut: {
+            /** Category */
+            category: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /**
+             * Name
+             * @description the team's own name (places.manual_name)
+             */
+            name: string;
+            /** Place Id */
+            place_id: string;
+        };
+        /**
          * MatchCriteria
          * @description Search criteria shared by AI Match, Group Session and Food Journey.
          */
@@ -748,6 +807,42 @@ export interface components {
             is_host: boolean;
             /** Votes Cast */
             votes_cast: number;
+        };
+        /**
+         * PlaceSummaryOut
+         * @description Basic facts about one place, for the place panel and for cards in other features.
+         *
+         *     Ratings and review summaries are not here: they come from M4 (`/api/reviews/analysis/{place_id}`)
+         *     and M3 (`/api/match/{place_id}/insights`).
+         */
+        PlaceSummaryOut: {
+            /** Address */
+            address?: string | null;
+            /** Category */
+            category: string;
+            /**
+             * Google Maps Url
+             * @description link for the 'open in Google Maps' button
+             */
+            google_maps_url?: string | null;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /**
+             * Name
+             * @description the team's own name (places.manual_name)
+             */
+            name: string;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Price Per Person
+             * @description VND per person
+             */
+            price_per_person?: number | null;
+            /** Tiktok Urls */
+            tiktok_urls?: string[];
         };
         /** RegisterIn */
         RegisterIn: {
@@ -1704,6 +1799,64 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WhyOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_places_api_places_map_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapPlaceOut"][];
+                };
+            };
+        };
+    };
+    place_summary_api_places__place_id__summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                place_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceSummaryOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
