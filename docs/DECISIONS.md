@@ -151,13 +151,14 @@ average); scoring is done by pure functions in `modules/match/scoring.py`, so it
 without a database. Group Session and Food Journey reuse the same pipeline through
 `MatchCandidateProvider` (only `k` differs).
 
-**Formula.** Weighted average of four components, each in 0..1:
+**Formula.** Weighted average of five components, each in 0..1 (see D17 for `facet`):
 
 | Component | Weight | Meaning                                                                        |
 | --------- | ------ | ------------------------------------------------------------------------------ |
-| semantic  | 0.55   | cosine similarity between the mood and the place embedding, calibrated (below) |
-| distance  | 0.20   | 1 at the origin, 0 at the edge of the radius (straight-line)                   |
-| rating    | 0.15   | average of our own reviews, shrunk towards a neutral prior                     |
+| semantic  | 0.45   | cosine similarity between the mood and the place embedding, calibrated (below) |
+| facet     | 0.30   | how many reviewers' tags answer the wishes found in the mood (D17)             |
+| distance  | 0.15   | 1 at the origin, 0 at the edge of the radius (straight-line)                   |
+| rating    | 0.10   | average of our own reviews, shrunk towards a neutral prior                     |
 | budget    | 0.10   | 1 when the price is inside `[price_min, price_max]`                            |
 
 A component that does not apply (no origin, no budget) is dropped and the remaining weights are
@@ -383,14 +384,61 @@ at the next regeneration, or at once with `--place Qxxx --force`.
 Before this, `CandidateProvider.find_candidates` returned only `place_id`, score and tags, so the vote cards
 showed "Quán #1" plus a raw place ID: the name that `/api/match` already returns (D10) was dropped on the way.
 
-| Decision                                                                                   | Why                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PlaceCandidate.name` (optional) in `app/shared/contracts.py`                              | One field in the shared contract serves M5 and M6; `MatchResult` already inherits it. The stub provider carries the same sample names as `/api/match` |
-| `group_candidates.name` stores a copy taken when the host starts the room                  | It is `places.manual_name`, typed by the team, not Google data (D10), so storing it is allowed. A room lives 30 minutes: a snapshot is simpler than a join |
-| `CandidateOut.name` is `null` when the provider has no name                                | The UI falls back to "Quán #rank"                                                                                                                         |
-| The directions link uses the name as `destination` next to `destination_place_id`          | Google routes by the place ID when it is a real one and falls back to the text                                                                           |
+| Decision                                                                          | Why                                                                                                                                                        |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PlaceCandidate.name` (optional) in `app/shared/contracts.py`                     | One field in the shared contract serves M5 and M6; `MatchResult` already inherits it. The stub provider carries the same sample names as `/api/match`      |
+| `group_candidates.name` stores a copy taken when the host starts the room         | It is `places.manual_name`, typed by the team, not Google data (D10), so storing it is allowed. A room lives 30 minutes: a snapshot is simpler than a join |
+| `CandidateOut.name` is `null` when the provider has no name                       | The UI falls back to "Quán #rank"                                                                                                                          |
+| The directions link uses the name as `destination` next to `destination_place_id` | Google routes by the place ID when it is a real one and falls back to the text                                                                             |
 
 The host can also add an area: "Gần vị trí của tôi" sends the device position as `origin`, and only then are the
 radius chips shown, because the backend filters by distance from `origin` only.
 
 **Known limits.** The live Google name, photo and rating (M7 `PlaceSummaryCard`) are still missing from the cards.
+
+## D17. AI Match (M3): hard rules and tag facets next to the embedding
+
+**Problem.** One blurred vector per place cannot hold constraints. "Quán cà phê yên tĩnh học bài" returned a
+one-review café (LaBoong) because its short text was close to anything, and "quán ăn chay thanh đạm"
+returned a noodle shop because "Thanh đạm, nhẹ bụng" was repeated in many reviews while the single "Chay" tag
+was invisible to the model. The cons ("Chật chội", "Không gian nhỏ") were also embedded as plain words, and an
+embedding cannot read "Điểm trừ:" as a complaint.
+
+**Decisions**
+
+- **Hard rules are read from the sentence by plain code** (`query_intent.py`): exactly one place kind
+  ("cà phê", "tiệm bánh", "chè", "quán ăn") filters by category; "chay" requires the Chay tag or the word in
+  the name. A rule that would remove every place is skipped, so the user never sees an empty page. An
+  explicit `criteria.categories` from the client always wins.
+- **Facets score the reviewers' own tags** (`facets.py`): "học bài", "date", "yên tĩnh", ... map to tags of the
+  review form. `share = reviews with the tag / (n + 1)`, so one review is weak evidence; tags add up
+  (noisy-OR); negative tags ("Ồn ào") subtract. No facet in the query = component dropped (weights
+  re-normalised, same rule as distance/budget).
+- **Cons are not embedded** (`text_builder.py`). They stay available to facets (penalties) and to the insights
+  tab. Rare tags get plain synonyms that never repeat the tag ("Chay" -> "quán chay, món chay, đồ chay thuần
+  thực vật"). The text is capped at 900 characters (about 250 tokens). Comments are chosen, not just the
+  longest: junk (links, phone numbers, shouting) and empty praise ("ngon tuyệt vời") are dropped, comments of
+  reviews with a mean score below 3.5 are skipped (mostly complaints, which an embedding cannot read), one
+  comment per account, near duplicates once, then the most concrete and recent first.
+- **Model: `intfloat/multilingual-e5-small` is the default** (`embedding.py`). Prefixes and the cosine range
+  (`SIM_LOW/HIGH` = 0.80/0.88) travel with the model in `PROFILES`; MiniLM stays selectable with the env var
+  `EMBED_MODEL`. Same 384 dimensions, so no migration. Measured on our 40 places (`scripts/eval_search.py`,
+  `scripts/show_cosine.py`): for "quán ăn chay thanh đạm" the vegetarian place ranked 33/40 by raw cosine with
+  MiniLM and 1/40 with e5; for "quán cà phê phù hợp để đi date" the best-tagged café ranked 1/40 with e5. On
+  the 10-query golden list e5 passed 10/10 and MiniLM 9/10. The list is small and was corrected twice from
+  the tags in reviews.csv, so treat the margin as indicative, not proven.
+  The env var must be identical when computing vectors and when serving: the query only matches vectors of its own
+  model, so a mismatch returns no places. After a model change re-run `compute_embeddings.py` and
+  `generate_insights.py --force` (the "why this place" bullets are embedded and shown only for the active model).
+- **Rejected after measuring.** (1) Using the Groq insights (`pros`, FAQ) in the text and the facets: no gain with
+  MiniLM once the golden list was corrected (not measured with e5). (2) A compact text
+  (tags only, about 100 tokens): worse raw cosine, and the semantic score saturated (21/40 places above `SIM_HIGH`).
+  Both can be tried again with the eval script. (3) Summaries of all reviews: tags and facets already carry the
+  signal, and a summary tends to erase the details that tell places apart.
+- **No new LLM call.** The facets use tags people already ticked. Groq stays offline and only feeds insights (D13).
+
+**Check.** `scripts/eval_search.py` runs a small golden list on the real database; add a line whenever a search
+looks wrong.
+
+**Known limits.** The facet lexicon is hand-written for the current form's tags: a new tag in the form needs a
+line in `facets.FACETS`. A place with one review is still weak evidence.

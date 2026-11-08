@@ -32,9 +32,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.errors import AppError, not_found
-from app.modules.match.embedding import EMBED_MODEL, encode_queries
+from app.modules.match.embedding import EMBED_MODEL, SIM_HIGH, SIM_LOW, encode_queries
+from app.modules.match.facets import facets_score, passes_required
 from app.modules.match.insights import PRESET_QUESTIONS
 from app.modules.match.models import Place, PlaceEmbedding, PlaceHighlight, PlaceInsight
+from app.modules.match.query_intent import QueryIntent, parse_query
 from app.modules.match.schemas import (
     DishCount,
     FaqItem,
@@ -118,6 +120,38 @@ async def _tags_for(db: AsyncSession, scored: list[Scored]) -> dict[str, list[st
                     picked.append(v)
         tags[s.place_id] = (picked or [s.category])[:MAX_TAGS]
     return tags
+
+
+async def _review_tags_for(db: AsyncSession, place_ids: list[str]) -> dict[str, list]:
+    """Visible reviews of the given places, only the columns the facet score reads."""
+    rows = await db.execute(
+        select(
+            Review.place_id,
+            Review.suitable_for,
+            Review.atmosphere,
+            Review.facilities,
+            Review.food_types,
+            Review.pros,
+            Review.crowd_level,
+        ).where(Review.place_id.in_(place_ids), Review.status == "visible")
+    )
+    by_place: dict[str, list] = defaultdict(list)
+    for row in rows:
+        by_place[row.place_id].append(row)
+    return by_place
+
+
+def _apply_intent(rows: list, intent: QueryIntent, explicit_categories: bool) -> list:
+    """Hard rules read from the sentence ("quán cà phê", "ăn chay"); never leaves the user with nothing.
+
+    If a rule would remove EVERY place (e.g. nobody sells vegetarian food), it is skipped: a
+    semantic answer is better than an empty page.
+    """
+    if intent.categories and not explicit_categories:
+        wanted = {c.casefold() for c in intent.categories}
+        kept = [r for r in rows if r.category.casefold() in wanted]
+        rows = kept or rows
+    return rows
 
 
 async def _crowd_for(db: AsyncSession, place_ids: list[str]) -> dict[str, float | None]:
@@ -270,6 +304,7 @@ class MatchCandidateProvider:
             select(
                 Place.place_id,
                 Place.category,
+                Place.manual_name,
                 Place.lat,
                 Place.lng,
                 Place.price_per_person,
@@ -293,6 +328,22 @@ class MatchCandidateProvider:
             stmt = stmt.where(Place.lat.between(lat_lo, lat_hi), Place.lng.between(lng_lo, lng_hi))
 
         rows = (await db.execute(stmt)).all()
+
+        # Hard rules and wishes found in the sentence (categories, dietary needs, review tags).
+        intent = parse_query(criteria.mood)
+        rows = _apply_intent(rows, intent, explicit_categories=bool(criteria.categories))
+        review_tags: dict[str, list] = {}
+        if rows and (intent.facets or intent.required):
+            review_tags = await _review_tags_for(db, [r.place_id for r in rows])
+        if intent.required:
+            ok = [
+                r
+                for r in rows
+                if passes_required(intent.required, r.manual_name, review_tags.get(r.place_id, []))
+            ]
+            rows = ok or rows
+        facet_of = {r.place_id: facets_score(intent.facets, review_tags.get(r.place_id, [])) for r in rows}
+
         pool = [
             RawCandidate(
                 place_id=r.place_id,
@@ -304,11 +355,14 @@ class MatchCandidateProvider:
                 ),
                 avg_rating=None if r.avg_rating is None else float(r.avg_rating),  # Decimal -> float
                 n_reviews=int(r.n_reviews or 0),
+                facet=facet_of[r.place_id],
             )
             for r in rows
         ]
         return score_candidates(
             pool,
+            sim_low=SIM_LOW,
+            sim_high=SIM_HIGH,
             radius_m=criteria.radius_m,
             price_min=criteria.price_min,
             price_max=criteria.price_max,

@@ -13,6 +13,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
+from app.modules.match import scoring, service
 from app.modules.match.embedding import EMBED_DIM, EMBED_MODEL
 
 PLACE_PREFIX = "match_test_"
@@ -41,6 +42,14 @@ def query_vector() -> list[float]:
     vec = [0.0] * EMBED_DIM
     vec[0] = 1.0
     return vec
+
+
+@pytest.fixture(autouse=True)
+def _fake_cosines_use_the_default_scale(monkeypatch):
+    """The hand-made embeddings below use cosines such as 0.2, 0.5 and 0.9. They are mapped to 0..1 with the
+    default range of scoring.py, whichever model is active in the app (e5 maps everything under 0.80 to 0)."""
+    monkeypatch.setattr(service, "SIM_LOW", scoring.SIM_LOW)
+    monkeypatch.setattr(service, "SIM_HIGH", scoring.SIM_HIGH)
 
 
 @pytest.fixture

@@ -457,6 +457,41 @@
         "title": "MapPlace",
         "type": "object"
       },
+      "MapPlaceOut": {
+        "description": "One pin on the home map: only what is needed to draw and select it.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "description": "the team's own name (places.manual_name)",
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "title": "MapPlaceOut",
+        "type": "object"
+      },
       "MatchCriteria": {
         "description": "Search criteria shared by AI Match, Group Session and Food Journey.",
         "properties": {
@@ -672,6 +707,83 @@
           "votes_cast"
         ],
         "title": "ParticipantOut",
+        "type": "object"
+      },
+      "PlaceSummaryOut": {
+        "description": "Basic facts about one place, for the place panel and for cards in other features.\n\nRatings and review summaries are not here: they come from M4 (`/api/reviews/analysis/{place_id}`)\nand M3 (`/api/match/{place_id}/insights`).",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "google_maps_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "link for the 'open in Google Maps' button",
+            "title": "Google Maps Url"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "description": "the team's own name (places.manual_name)",
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "VND per person",
+            "title": "Price Per Person"
+          },
+          "tiktok_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tiktok Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "title": "PlaceSummaryOut",
         "type": "object"
       },
       "RegisterIn": {
@@ -1361,6 +1473,232 @@
           "poll_interval_ms"
         ],
         "title": "RoomStateOut",
+        "type": "object"
+      },
+      "SavedListIn": {
+        "properties": {
+          "icon": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Icon",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "icon"
+        ],
+        "title": "SavedListIn",
+        "type": "object"
+      },
+      "SavedListOut": {
+        "properties": {
+          "icon": {
+            "description": "an emoji, also used as the pin icon of the places in this list",
+            "title": "Icon",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "description": "the 'Yêu thích' list: can be renamed but not deleted",
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "place_count": {
+            "title": "Place Count",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "icon",
+          "position",
+          "is_default",
+          "place_count"
+        ],
+        "title": "SavedListOut",
+        "type": "object"
+      },
+      "SavedListUpdateIn": {
+        "description": "Only the fields that are sent are changed.",
+        "properties": {
+          "icon": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          }
+        },
+        "title": "SavedListUpdateIn",
+        "type": "object"
+      },
+      "SavedPlaceIn": {
+        "properties": {
+          "list_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "omitted: the default list; saving again moves the place",
+            "title": "List Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "place_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Place Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id"
+        ],
+        "title": "SavedPlaceIn",
+        "type": "object"
+      },
+      "SavedPlaceOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "list_icon": {
+            "title": "List Icon",
+            "type": "string"
+          },
+          "list_id": {
+            "format": "uuid",
+            "title": "List Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "place_id",
+          "list_id",
+          "list_icon",
+          "created_at"
+        ],
+        "title": "SavedPlaceOut",
+        "type": "object"
+      },
+      "SavedPlaceUpdateIn": {
+        "description": "Only the fields that are sent are changed (send `note: null` to clear the note).",
+        "properties": {
+          "list_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "List Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "SavedPlaceUpdateIn",
         "type": "object"
       },
       "StartIn": {
@@ -2259,6 +2597,80 @@
         ]
       }
     },
+    "/api/places/map": {
+      "get": {
+        "description": "Every place reduced to what the home map needs to draw a pin.",
+        "operationId": "map_places_api_places_map_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MapPlaceOut"
+                  },
+                  "title": "Response Map Places Api Places Map Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Map Places",
+        "tags": [
+          "M7 google places"
+        ]
+      }
+    },
+    "/api/places/{place_id}/summary": {
+      "get": {
+        "description": "Basic facts about one place (404 `not_found` when the id is unknown).",
+        "operationId": "place_summary_api_places__place_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "place_id",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Place Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Summary",
+        "tags": [
+          "M7 google places"
+        ]
+      }
+    },
     "/api/reviews": {
       "get": {
         "description": "Visible reviews written on the website, newest first (guests allowed).\n`is_mine` marks the caller's own.\n\nInternal reviews imported from the team's form are not listed; they only feed Match and Analysis.",
@@ -2639,6 +3051,362 @@
         "summary": "Report Review",
         "tags": [
           "M4 reviews"
+        ]
+      }
+    },
+    "/api/saved-places": {
+      "get": {
+        "operationId": "my_saved_places_api_saved_places_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedPlaceOut"
+                  },
+                  "title": "Response My Saved Places Api Saved Places Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "My Saved Places",
+        "tags": [
+          "M2 saved places"
+        ]
+      },
+      "post": {
+        "description": "Save a place (201). Saving an already saved place moves it / updates the note (200).",
+        "operationId": "save_place_api_saved_places_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPlaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlaceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Place",
+        "tags": [
+          "M2 saved places"
+        ]
+      }
+    },
+    "/api/saved-places/lists": {
+      "get": {
+        "description": "The user's lists with place counts. The default list is created on the first call.",
+        "operationId": "my_lists_api_saved_places_lists_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedListOut"
+                  },
+                  "title": "Response My Lists Api Saved Places Lists Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "My Lists",
+        "tags": [
+          "M2 saved places"
+        ]
+      },
+      "post": {
+        "operationId": "create_list_api_saved_places_lists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedListIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create List",
+        "tags": [
+          "M2 saved places"
+        ]
+      }
+    },
+    "/api/saved-places/lists/{list_id}": {
+      "delete": {
+        "description": "Deletes the list and the saved places in it. The default list cannot be deleted (400).",
+        "operationId": "delete_list_api_saved_places_lists__list_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "List Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete List",
+        "tags": [
+          "M2 saved places"
+        ]
+      },
+      "patch": {
+        "operationId": "update_list_api_saved_places_lists__list_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "List Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedListUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update List",
+        "tags": [
+          "M2 saved places"
+        ]
+      }
+    },
+    "/api/saved-places/{saved_id}": {
+      "delete": {
+        "operationId": "delete_saved_place_api_saved_places__saved_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saved_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Saved Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Saved Place",
+        "tags": [
+          "M2 saved places"
+        ]
+      },
+      "patch": {
+        "operationId": "update_saved_place_api_saved_places__saved_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saved_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Saved Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPlaceUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlaceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Saved Place",
+        "tags": [
+          "M2 saved places"
         ]
       }
     }
