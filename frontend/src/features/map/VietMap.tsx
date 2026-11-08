@@ -155,13 +155,19 @@ export function VietMap({
             setPlacesMap(instance as unknown as PlacesMap);
           }
         });
-        instance.on("error", () => {
-          if (active) {
-            setError(
-              "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
-            );
-          }
-        });
+                instance.on("error", (event) => {
+                  // A missing font file or glyph range is not a broken map: names may not draw, the pins still do.
+                  const detail = `${(event.error as { url?: string } | undefined)?.url ?? ""} ${event.error?.message ?? ""}`;
+                  if (detail.includes("/fonts/")) {
+                    console.warn("[VietMap] glyph request failed:", detail.trim());
+                    return;
+                  }
+                  if (active) {
+                    setError(
+                      "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
+                    );
+                  }
+                });
       })
       .catch((cause: unknown) => {
         if (active) {

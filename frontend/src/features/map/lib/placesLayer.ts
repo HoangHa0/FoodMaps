@@ -45,6 +45,7 @@ interface ClickEvent {
 /** The slice of the VietMap / MapLibre map API used here. */
 export interface PlacesMap {
   isStyleLoaded(): boolean;
+  getStyle(): { layers?: Array<{ layout?: Record<string, unknown> }> } | undefined;
   getSource(id: string): unknown;
   addSource(id: string, source: unknown): unknown;
   getLayer(id: string): unknown;
@@ -75,6 +76,8 @@ export function buildPinCollection(
   places: readonly MapPin[],
   selectedId: string | null,
   savedIds: ReadonlySet<string>,
+  /** place_id -> icon of the saved list that holds it; a saved place without an entry keeps its category icon */
+  iconByPlace?: ReadonlyMap<string, string>,
 ): PinCollection {
   return {
     type: "FeatureCollection",
@@ -82,13 +85,14 @@ export function buildPinCollection(
       const selected = place.place_id === selectedId;
       const saved = savedIds.has(place.place_id);
       const variant = selected ? "selected" : saved ? "saved" : "default";
+      const icon = (saved && iconByPlace?.get(place.place_id)) || categoryIcon(place.category);
       return {
         type: "Feature",
         geometry: { type: "Point", coordinates: [place.lng, place.lat] },
         properties: {
           id: place.place_id,
           name: place.name,
-          iconId: pinImageId(variant, categoryIcon(place.category)),
+          iconId: pinImageId(variant, icon),
           priority: selected ? PRIORITY.selected : saved ? PRIORITY.saved : PRIORITY.other,
           selected,
         },
@@ -102,12 +106,22 @@ export interface PlacesLayerOptions {
   textColors: TextColors;
   onSelect: (placeId: string) => void;
   onBackgroundClick: () => void;
-  /** Font stack that exists in the map style and covers Vietnamese. Left to the style default if unset. */
+  /**
+   * Font stack for the place names. Normally left unset: the font is then copied from a label layer of
+   * the map style itself, because that font is known to exist on the glyph server and to cover Vietnamese.
+   * (MapLibre's default stack "Open Sans Regular,Arial Unicode MS Regular" does not exist on VietMap's
+   * server: every glyph request answers 400 and the symbols never get drawn.)
+   */
   textFont?: string[];
 }
 
 export interface PlacesLayerController {
-  setData(places: readonly MapPin[], selectedId: string | null, savedIds: ReadonlySet<string>): void;
+  setData(
+    places: readonly MapPin[],
+    selectedId: string | null,
+    savedIds: ReadonlySet<string>,
+    iconByPlace?: ReadonlyMap<string, string>,
+  ): void;
   /** Fly to a place (used when the user picks one from a list). */
   flyTo(placeId: string): void;
   destroy(): void;
@@ -117,7 +131,33 @@ function sizeByZoom(scale: number) {
   return ["interpolate", ["linear"], ["zoom"], 10, 0.45 * scale, 14, 0.7 * scale, 17, 0.95 * scale];
 }
 
-function layerSpec(id: string, selected: boolean, options: PlacesLayerOptions): Record<string, unknown> {
+const EXPRESSION_OPERATORS = new Set([
+  "get", "case", "step", "interpolate", "match", "coalesce", "format", "concat", "let", "var", "to-string",
+]);
+
+/** A font stack written as a plain array of names, or as ["literal", [...]]; anything else is not usable. */
+function fontStack(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  if (value[0] === "literal") return fontStack(value[1]);
+  if (!value.every((item) => typeof item === "string")) return undefined;
+  return EXPRESSION_OPERATORS.has(value[0] as string) ? undefined : (value as string[]);
+}
+
+/** The first font stack used by a label layer of the loaded style. */
+export function detectTextFont(map: PlacesMap): string[] | undefined {
+  for (const layer of map.getStyle()?.layers ?? []) {
+    const found = fontStack(layer.layout?.["text-font"]);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function layerSpec(
+  id: string,
+  selected: boolean,
+  options: PlacesLayerOptions,
+  font: string[] | undefined,
+): Record<string, unknown> {
   const layout: Record<string, unknown> = {
     "icon-image": ["get", "iconId"],
     "icon-size": sizeByZoom(selected ? 1.35 : 1),
@@ -131,7 +171,7 @@ function layerSpec(id: string, selected: boolean, options: PlacesLayerOptions): 
     "text-allow-overlap": selected,
     "symbol-sort-key": ["get", "priority"], // lower value is placed first, so it wins a collision
   };
-  if (options.textFont) layout["text-font"] = options.textFont;
+  if (font) layout["text-font"] = font;
 
   return {
     id,
@@ -155,14 +195,26 @@ export function createPlacesLayer(map: PlacesMap, options: PlacesLayerOptions): 
     const source = map.getSource(PLACES_SOURCE) as { setData?: (data: PinCollection) => void } | undefined;
     if (!source) map.addSource(PLACES_SOURCE, { type: "geojson", data: collection });
     else source.setData?.(collection);
-    if (!map.getLayer(PINS_LAYER)) map.addLayer(layerSpec(PINS_LAYER, false, options));
-    if (!map.getLayer(SELECTED_LAYER)) map.addLayer(layerSpec(SELECTED_LAYER, true, options));
+    const font = options.textFont ?? detectTextFont(map);
+    if (!font) console.warn("[places] no text-font found in the map style: place names may not draw");
+    if (!map.getLayer(PINS_LAYER)) map.addLayer(layerSpec(PINS_LAYER, false, options, font));
+    if (!map.getLayer(SELECTED_LAYER)) map.addLayer(layerSpec(SELECTED_LAYER, true, options, font));
   };
 
   const unregisterImages = registerPinImages(map, options.pinColors);
 
-  const onStyleLoad = () => ensureLayers();
-  if (map.isStyleLoaded()) ensureLayers();
+  // Do not gate on `map.isStyleLoaded()`: it stays false while tiles are still loading, long after the
+  // style itself is ready, so the layers would never be added. addSource/addLayer throw only while the
+  // style JSON has not loaded yet, and `style.load` calls this again at that point.
+  const tryEnsure = () => {
+    try {
+      ensureLayers();
+    } catch {
+      /* style not ready yet: style.load will retry */
+    }
+  };
+  const onStyleLoad = () => tryEnsure();
+  tryEnsure();
   map.on("style.load", onStyleLoad);
 
   const onPinClick = (event: { features?: Array<{ properties?: { id?: string } }> }) => {
@@ -188,10 +240,10 @@ export function createPlacesLayer(map: PlacesMap, options: PlacesLayerOptions): 
   map.on("click", onMapClick as never);
 
   return {
-    setData(next, selectedId, savedIds) {
+    setData(next, selectedId, savedIds, iconByPlace) {
       places = next;
-      collection = buildPinCollection(next, selectedId, savedIds);
-      if (map.isStyleLoaded()) ensureLayers();
+      collection = buildPinCollection(next, selectedId, savedIds, iconByPlace);
+      tryEnsure();
     },
     flyTo(placeId) {
       const place = places.find((p) => p.place_id === placeId);

@@ -16,6 +16,8 @@ interface Params {
   places: readonly MapPin[];
   selectedId: string | null;
   savedIds?: ReadonlySet<string>;
+  /** place_id -> icon of its saved list (saved pins use the list's icon instead of the category icon) */
+  iconByPlace?: ReadonlyMap<string, string>;
   options: PlacesLayerOptions;
 }
 
@@ -30,7 +32,14 @@ const NO_SAVED: ReadonlySet<string> = new Set();
  *
  * `options` must be stable (module constant or useMemo): the layer is rebuilt when it changes.
  */
-export function usePlacesLayer({ map, places, selectedId, savedIds = NO_SAVED, options }: Params): void {
+export function usePlacesLayer({
+  map,
+  places,
+  selectedId,
+  savedIds = NO_SAVED,
+  iconByPlace,
+  options,
+}: Params): void {
   const controller = useRef<PlacesLayerController | null>(null);
   const lastFlownTo = useRef<string | null>(null);
 
@@ -45,8 +54,8 @@ export function usePlacesLayer({ map, places, selectedId, savedIds = NO_SAVED, o
   }, [map, options]);
 
   useEffect(() => {
-    controller.current?.setData(places, selectedId, savedIds);
-  }, [map, options, places, selectedId, savedIds]);
+    controller.current?.setData(places, selectedId, savedIds, iconByPlace);
+  }, [map, options, places, selectedId, savedIds, iconByPlace]);
 
   useEffect(() => {
     if (!selectedId || selectedId === lastFlownTo.current) return;
@@ -56,9 +65,9 @@ export function usePlacesLayer({ map, places, selectedId, savedIds = NO_SAVED, o
 }
 
 /**
- * Reads a CSS design token (e.g. "--color-fg") and converts it into a map-compatible colour string,
- * so canvas drawing and map paint follow the theme without hard-coded colours. The value is resolved
- * through a 1px canvas because the token may use a syntax the map's colour parser does not support.
+ * Reads a CSS design token (e.g. "--color-fg") as an `rgba(r, g, b, a)` string, so canvas drawing and
+ * map paint follow the theme without literals. The value is resolved through a 1px canvas because the
+ * token may be written in a syntax the map's colour parser does not know (oklch, color-mix, ...).
  * Returns "" on the server or when the token does not exist.
  */
 export function readToken(name: string): string { // design-ok: convert CSS design token to map-compatible rgba
