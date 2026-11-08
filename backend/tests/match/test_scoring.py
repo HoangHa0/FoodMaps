@@ -1,5 +1,7 @@
 """Pure scoring tests: no database, no model."""
 
+from dataclasses import replace
+
 import pytest
 
 from app.modules.match import scoring as sc
@@ -245,3 +247,136 @@ def test_mean_crowd_ignores_unknown_answers():
 def test_with_crowd_attaches_numbers():
     out = sc.with_crowd([scored("a"), scored("b")], {"a": 0.3})
     assert [p.crowd for p in out] == [0.3, None]
+
+
+# --------------------------------------------------------------------------- "Not Match" yardstick
+
+
+def test_too_expensive_drops_places_that_are_not_cheaper_than_the_rejected_one():
+    rejected = scored("rejected", score=0.9, price=35_000)
+    dear = scored("dear", score=0.90, price=60_000)  # best score, but dearer than the rejected one
+    dearer = scored("dearer", score=0.75, price=120_000)
+    unknown = scored("unknown", score=0.72, price=None)
+    cheap = scored("cheap", score=0.70, price=20_000)
+    out = sc.rerank_after_reject(
+        [rejected, dear, dearer, unknown, cheap], sc.REASON_TOO_EXPENSIVE, rejected_place_id="rejected"
+    )
+    assert order(out) == ["cheap", "unknown"]  # dear and dearer cost more than the 35k just rejected
+
+
+def test_nothing_cheaper_than_the_cheapest_place_gives_an_empty_answer():
+    rejected = scored("rejected", price=31_500)
+    others = [scored("a", price=40_000), scored("b", price=31_500), scored("c", price=90_000)]
+    out = sc.rerank_after_reject([rejected, *others], sc.REASON_TOO_EXPENSIVE, rejected_place_id="rejected")
+    assert out == []
+
+
+def test_too_far_drops_places_as_far_as_the_rejected_one():
+    rejected = scored("rejected", distance=900)
+    same = scored("same", score=0.95, distance=900)
+    nearer = scored("nearer", score=0.60, distance=800)
+    out = sc.rerank_after_reject([rejected, same, nearer], sc.REASON_TOO_FAR, rejected_place_id="rejected")
+    assert order(out) == ["nearer"]
+
+
+def test_too_crowded_demotes_places_as_crowded_as_the_rejected_one():
+    rejected = scored("rejected", crowd=0.8)
+    packed = scored("packed", score=0.95, crowd=0.9)
+    calmer = scored("calmer", score=0.60, crowd=0.2)
+    out = sc.rerank_after_reject(
+        [rejected, packed, calmer], sc.REASON_TOO_CROWDED, rejected_place_id="rejected"
+    )
+    assert order(out) == ["calmer", "packed"]
+
+
+def test_yardstick_needs_known_values_on_both_sides():
+    rejected = scored("rejected", price=None)
+    a, b = scored("a", score=0.9, price=80_000), scored("b", score=0.6, price=20_000)
+    out = sc.rerank_after_reject([rejected, b, a], sc.REASON_TOO_EXPENSIVE, rejected_place_id="rejected")
+    assert order(out) == ["b", "a"]  # unchanged rule: relative cheapness, nobody is demoted
+
+
+def test_explicit_rejected_place_can_be_passed_when_it_is_not_in_the_list():
+    rejected = scored("rejected", price=35_000)
+    dear, cheap = scored("dear", score=0.9, price=60_000), scored("cheap", score=0.6, price=20_000)
+    out = sc.rerank_after_reject([dear, cheap], sc.REASON_TOO_EXPENSIVE, rejected=rejected)
+    assert order(out) == ["cheap"]
+
+
+def test_cheaper_but_off_topic_place_is_not_offered_after_too_expensive():
+    # a Korean restaurant was "too expensive": a coworking space is cheaper but has nothing to do with it
+    rejected = scored("korean", score=0.80, price=150_000)
+    workspace = scored("workspace", score=0.45, price=35_000)
+    grill = scored("grill", score=0.70, price=90_000)
+    everyone = [rejected, workspace, grill]
+    out = sc.rerank_after_reject(everyone, sc.REASON_TOO_EXPENSIVE, rejected_place_id="korean")
+    assert order(out) == ["grill"]
+
+
+def test_after_too_expensive_the_place_most_like_the_rejected_one_comes_first():
+    # Cece'Box (sit-down Korean) rejected as too dear: Busan Yori is like it, Lotteria is only cheaper
+    cece = scored("cece", score=0.80, price=150_000)
+    lotteria = scored("lotteria", score=0.78, price=45_000)
+    busan = scored("busan", score=0.74, price=90_000)
+    ranked = sc.with_vibe_similarity([cece, lotteria, busan], {"lotteria": 0.84, "busan": 0.92})
+    out = sc.rerank_after_reject(ranked, sc.REASON_TOO_EXPENSIVE, rejected_place_id="cece")
+    assert order(out) == ["busan", "lotteria"]
+
+
+def test_without_similarities_too_expensive_still_prefers_the_cheaper_place():
+    cece = scored("cece", score=0.80, price=150_000)
+    lotteria = scored("lotteria", score=0.78, price=45_000)
+    busan = scored("busan", score=0.74, price=90_000)
+    out = sc.rerank_after_reject([cece, lotteria, busan], sc.REASON_TOO_EXPENSIVE, rejected_place_id="cece")
+    assert order(out) == ["lotteria", "busan"]
+
+
+def test_another_kind_of_place_is_not_offered_after_too_expensive():
+    # same score as the restaurant, still not what a user who wanted food asked for
+    def place(pid, category, price):
+        return replace(scored(pid, score=0.78, price=price), category=category)
+
+    rejected = place("cece", "Quán ăn", 150_000)
+    workspace = place("workspace", "Cà phê & Trà", 35_000)
+    grill = place("grill", "Quán ăn", 90_000)
+    out = sc.rerank_after_reject(
+        [rejected, workspace, grill], sc.REASON_TOO_EXPENSIVE, rejected_place_id="cece"
+    )
+    assert order(out) == ["grill"]
+
+
+def test_off_topic_place_is_not_offered_after_too_far_or_too_crowded():
+    far = scored("far", score=0.80, distance=1500, crowd=0.9)
+    near_off = scored("near_off", score=0.40, distance=100, crowd=0.1)
+    near_ok = scored("near_ok", score=0.65, distance=600, crowd=0.3)
+    for reason in (sc.REASON_TOO_FAR, sc.REASON_TOO_CROWDED):
+        out = sc.rerank_after_reject([far, near_off, near_ok], reason, rejected_place_id="far")
+        assert order(out) == ["near_ok"]
+
+
+def test_wrong_vibe_prefers_the_place_unlike_the_rejected_one():
+    twin = scored("twin", score=0.80, semantic=0.7)
+    different = scored("different", score=0.74, semantic=0.7)
+    out = sc.with_vibe_similarity([twin, different], {"twin": 0.95, "different": 0.30})
+    assert [p.vibe_to_rejected for p in out] == [0.95, 0.30]
+    ranked = sc.rerank_after_reject(out, sc.REASON_WRONG_VIBE)
+    assert order(ranked) == ["different", "twin"]
+
+
+def test_wrong_vibe_without_similarity_falls_back_to_the_mood_match():
+    near_wrong = scored("near", score=0.75, semantic=0.2)
+    far_right = scored("far", score=0.70, semantic=0.9)
+    assert order(sc.rerank_after_reject([near_wrong, far_right], sc.REASON_WRONG_VIBE)) == ["far", "near"]
+
+
+def test_wrong_vibe_unlikeness_is_relative_within_the_backups():
+    a, b, c = (scored(x, score=0.7, semantic=0.6) for x in "abc")
+    out = sc.with_vibe_similarity([a, b, c], {"a": 0.90, "b": 0.86, "c": 0.82})  # a narrow band, as e5 gives
+    ranked = sc.rerank_after_reject(out, sc.REASON_WRONG_VIBE)
+    assert order(ranked) == ["c", "b", "a"]  # least like the rejected place first
+
+
+def test_wrong_vibe_ignores_similarities_that_are_all_equal():
+    a, b = scored("a", score=0.8, semantic=0.6), scored("b", score=0.7, semantic=0.6)
+    out = sc.with_vibe_similarity([a, b], {"a": 0.9, "b": 0.9})
+    assert order(sc.rerank_after_reject(out, sc.REASON_WRONG_VIBE)) == ["a", "b"]

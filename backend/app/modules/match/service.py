@@ -58,13 +58,17 @@ from app.modules.match.scoring import (
     rerank_after_reject,
     score_candidates,
     with_crowd,
+    with_vibe_similarity,
 )
 from app.modules.match.text_builder import top_values
 from app.modules.match.why import Highlight, WhyPick, join_points, pick_points
 from app.modules.reviews.models import Review
 from app.shared.contracts import MatchCriteria, PlaceCandidate, StubCandidateProvider
 
-BACKUP_COUNT = 3  # spec: "top 2-3 quán dự phòng"
+# Spec said "top 2-3 quán dự phòng", but "Không hợp" can only reorder what the client holds, and
+# with 3 backups every complaint ran out of places that fit it. 8 keeps the list short (the user
+# sees one place at a time) and stays under RejectIn.remaining's limit of 10.
+BACKUP_COUNT = 8
 POOL_LIMIT = 300  # safety cap on rows read per search (the real data is 100-300 places)
 METERS_PER_DEGREE = 111_320
 MAX_TAGS = 4
@@ -169,6 +173,24 @@ async def _crowd_for(db: AsyncSession, place_ids: list[str]) -> dict[str, float 
     return {pid: mean_crowd(levels[pid]) for pid in place_ids}
 
 
+async def _vibe_similarity(db: AsyncSession, rejected_id: str, ids: list[str]) -> dict[str, float]:
+    """Cosine between the rejected place and each other place (vectors are normalised: dot product)."""
+    rows = await db.execute(
+        select(PlaceEmbedding.place_id, PlaceEmbedding.embedding).where(
+            PlaceEmbedding.place_id.in_([rejected_id, *ids]), PlaceEmbedding.model_name == EMBED_MODEL
+        )
+    )
+    vectors = {r.place_id: [float(x) for x in r.embedding] for r in rows}
+    reference = vectors.get(rejected_id)
+    if reference is None:
+        return {}
+    return {
+        pid: sum(a * b for a, b in zip(reference, vec, strict=True))
+        for pid, vec in vectors.items()
+        if pid != rejected_id
+    }
+
+
 async def _names_for(db: AsyncSession, scored: list[Scored]) -> dict[str, str]:
     """The team's own place names (`places.manual_name`), one query for the whole result."""
     if not scored:
@@ -271,8 +293,10 @@ class MatchCandidateProvider:
     async def _rerank(
         self, db: AsyncSession, criteria: MatchCriteria, reason: str, rejected_id: str, ids: list[str]
     ) -> list[MatchResult]:
-        scored = await self._scored(db, criteria, len(ids), place_ids=ids)
-        scored = with_crowd(scored, await _crowd_for(db, ids))
+        everyone = [*ids, rejected_id]  # the rejected place is the yardstick of the complaint
+        scored = await self._scored(db, criteria, len(everyone), place_ids=everyone)
+        scored = with_crowd(scored, await _crowd_for(db, everyone))
+        scored = with_vibe_similarity(scored, await _vibe_similarity(db, rejected_id, ids))
         ranked = rerank_after_reject(scored, reason, rejected_place_id=rejected_id)
         ratings = await _public_ratings_for(db, ranked)
         return _to_results(ranked, await _tags_for(db, ranked), await _names_for(db, ranked), ratings)
