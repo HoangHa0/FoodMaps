@@ -442,3 +442,35 @@ looks wrong.
 
 **Known limits.** The facet lexicon is hand-written for the current form's tags: a new tag in the form needs a
 line in `facets.FACETS`. A place with one review is still weak evidence.
+
+## D18. "Không hợp" (M3): the rejected place is the yardstick, and there are 8 backups
+
+**Problem.** The reject rerank only compared the backups with each other. "Too expensive" on a 35k place could
+show a 60k place next (the cheapest of three dearer ones), and "wrong vibe" reordered by the same semantic score
+that had just produced the wrong place, so the order did not change. With 3 backups every complaint ran out of
+places that fit it.
+
+**Decision** (`scoring.rerank_after_reject`, `service._rerank`; the API contract is unchanged):
+
+| Reason        | Rule                                                                                                       |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| too_expensive | Remove backups that are not cheaper than the rejected place. The rest: best match first, cheaper wins ties |
+| too_far       | Remove backups that are not closer than the rejected place. The rest: best match first, closer wins ties   |
+| too_crowded   | Backups that are not quieter go AFTER the quieter ones (not removed: crowd is free text, often empty)      |
+| wrong_vibe    | Mood match plus "unlike the rejected place": cosine between the two embeddings, scaled within the backups  |
+
+- A place with an unknown price, distance or crowd is never removed or demoted: missing data proves nothing.
+- The match to the request stays the main criterion (`REJECT_PREFERENCE_WEIGHT` 0.25). Except for "wrong vibe",
+  a backup that matches much worse than the rejected place (below `REJECT_MIN_RELATIVE_SCORE` = 75% of its
+  score), or that is another kind of place (restaurant vs coffee shop), is removed too: otherwise "cheaper" offered a coworking space after a Korean restaurant.
+- If nothing is left, the answer is the usual empty one (`best: null`) and the UI shows "Không còn quán dự phòng".
+  A user who presses "too expensive" by a small margin (31.5k -> 40k) loses every dearer backup; if that proves
+  annoying, remove only places clearly dearer (for example more than 20%).
+- For too expensive / far / crowded, the places that pass are also ordered by how LIKE the rejected place they are
+  (`REJECT_LIKENESS_SHARE` = 60% of the preference, same cosine as "wrong vibe"): after a Korean sit-down
+  restaurant, a cheaper sit-down Korean place comes before a cheaper fast-food chain.
+- "Unlike the rejected place" is scaled between the most and the least similar backup instead of with fixed
+  numbers: place-to-place cosines of e5 sit in a narrow band, and the band depends on the model.
+- `BACKUP_COUNT` 3 -> 8. The server never searches again on "Không hợp", so the backups are the pool. 8 stays
+  under `RejectIn.remaining` (10); 15-20 would be about half of the 40 places and the tail is not a match.
+- The rejected place is scored together with the backups (it is the yardstick) and then removed from the answer.
