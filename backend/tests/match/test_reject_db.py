@@ -144,9 +144,9 @@ async def test_nothing_left_gives_an_empty_answer(db_client, seed_place):
 
 
 async def test_without_origin_the_distance_is_null_and_nothing_crashes(db_client, seed_place):
-    rejected = await seed_place("rejected")
+    rejected = await seed_place("rejected", cosine=0.6)
     a = await seed_place("a", cosine=0.6)
-    b = await seed_place("b", cosine=0.45)
+    b = await seed_place("b", cosine=0.5)
     body = _body("too_far", rejected, [b, a])
     body["criteria"].pop("origin")
 
