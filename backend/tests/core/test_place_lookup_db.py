@@ -11,6 +11,8 @@ import pytest
 from app.modules.match.models import Place
 from app.shared import places
 
+pytestmark = pytest.mark.db
+
 # Centre of the test "map": Q001 of the team's catalogue
 LAT, LNG = 20.9893215, 105.8406215
 
