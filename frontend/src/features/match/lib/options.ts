@@ -23,6 +23,18 @@ export const BUDGETS: Budget[] = [
 ];
 
 /** The 4 quick reasons of "Không hợp" (spec 1.3), in the order they are shown. */
+/** Shown when "Không hợp" leaves nothing. */
+export const EMPTY_MESSAGE = "Không còn quán nào khớp tiêu chí. Thử mô tả khác hoặc nới bán kính, khoảng giá nhé.";
+
+/**
+ * Only these two reasons remove places (the server drops backups that are not cheaper / closer than the
+ * rejected one, DECISIONS D18), so only they can empty the list while backups were left.
+ */
+export const EMPTY_MESSAGE_AFTER: Partial<Record<RejectReason, string>> = {
+  too_far: "Không còn quán nào gần hơn quán vừa rồi. Thử nới bán kính hoặc đổi mô tả nhé.",
+  too_expensive: "Không còn quán nào rẻ hơn quán vừa rồi. Thử nâng khoảng giá hoặc đổi mô tả nhé.",
+};
+
 export const REJECT_REASONS: { reason: RejectReason; label: string }[] = [
   { reason: "too_far", label: "Quá xa" },
   { reason: "too_expensive", label: "Quá đắt" },

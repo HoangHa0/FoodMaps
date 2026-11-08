@@ -56,6 +56,7 @@ export function MatchSearch() {
         <MatchResultSheet
           result={best}
           backupsLeft={session.backups.length}
+          emptyAfter={session.emptyAfter}
           why={why.data}
           whyLoading={why.isLoading}
           directionsUrl={best ? directionsUrl(best.place_id, best.name) : ""}

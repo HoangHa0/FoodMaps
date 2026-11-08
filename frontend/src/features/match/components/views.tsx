@@ -33,6 +33,8 @@ import {
   BUDGETS,
   budgetIndex,
   DEFAULT_RADIUS,
+  EMPTY_MESSAGE,
+  EMPTY_MESSAGE_AFTER,
   MOOD_CHIPS,
   RADII,
   radiusLabel,
@@ -227,6 +229,7 @@ function AreaOptions({
 export function MatchResultSheet({
   result,
   backupsLeft,
+  emptyAfter,
   why,
   whyLoading,
   directionsUrl,
@@ -239,6 +242,7 @@ export function MatchResultSheet({
 }: {
   result: MatchResult | null;
   backupsLeft: number;
+  emptyAfter?: RejectReason;
   why: WhyOut | undefined;
   whyLoading: boolean;
   directionsUrl: string;
@@ -270,8 +274,8 @@ export function MatchResultSheet({
             <IconButton label="Đóng" variant="plain" icon={<IconClose className="size-5" />} onClick={onClose} />
           </div>
           <h2 className="font-display text-xl font-semibold">Chưa tìm được quán hợp</h2>
-          <p className="text-fg-muted">
-            Không còn quán nào khớp tiêu chí. Thử mô tả khác hoặc nới bán kính, khoảng giá nhé.
+          <p className="text-fg-muted" data-testid="match-empty">
+            {(emptyAfter && EMPTY_MESSAGE_AFTER[emptyAfter]) ?? EMPTY_MESSAGE}
           </p>
           <Button onClick={onSearchAgain}>Tìm lại</Button>
         </div>
@@ -282,14 +286,17 @@ export function MatchResultSheet({
               <h2 className="font-display text-xl font-bold" data-testid="match-name">
                 {result.name ?? "Quán phù hợp nhất"}
               </h2>
-              {/* Price and distance remain in the Why box; the public rating is shown above. */}
-              {result.distance_m != null && (
-                <p className="mt-1 text-sm text-fg-muted">Cách khoảng {formatDistance(result.distance_m)}</p>
-              )}
-              <p className="mt-1 text-sm text-fg-muted">
-                {result.avg_rating != null && result.review_count > 0
-                  ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
-                  : "Chưa có đánh giá"}
+              {/* One line of facts under the name: distance (only with an origin) · public rating.
+                  The Why box keeps the price; it does not repeat the distance or the rating. */}
+              <p className="mt-1 text-sm text-fg-muted" data-testid="match-meta">
+                {[
+                  result.distance_m != null ? `📍 Cách ${formatDistance(result.distance_m)}` : null,
+                  result.avg_rating != null && result.review_count > 0
+                    ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
+                    : "Chưa có đánh giá",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
             <Badge tone="accent">{Math.round(result.match_score * 100)}% MATCH</Badge>
@@ -307,7 +314,7 @@ export function MatchResultSheet({
           <WhyBox
             why={why}
             loading={whyLoading}
-            reasons={(result.reasons ?? []).filter((reason) => !reason.startsWith("⭐ "))}
+            reasons={(result.reasons ?? []).filter((reason) => !reason.startsWith("⭐ ") && !reason.startsWith("📍 "))}
           />
 
           <div className="grid grid-cols-3 gap-2">
@@ -379,7 +386,6 @@ function WhyBox({ why, loading, reasons }: { why: WhyOut | undefined; loading: b
         {points.map((p) => (
           <li key={p.text} className={cn(p.matched && "font-semibold")}>
             {p.text}
-            {p.matched && <span className="ml-1.5 text-xs font-normal text-fg-muted">· khớp với bạn</span>}
           </li>
         ))}
         {reasons.map((r) => (

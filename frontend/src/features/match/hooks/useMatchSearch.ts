@@ -10,6 +10,8 @@ export interface MatchSession {
   criteria: MatchCriteria;
   best: MatchResult | null;
   backups: MatchResult[];
+  /** The reason of the "Không hợp" that left nothing (undefined: ran out of backups, or a place is shown). */
+  emptyAfter?: RejectReason;
 }
 
 /**
@@ -29,14 +31,14 @@ export function useMatchSearch() {
 
   const reject = useMutation({
     mutationFn: async ({ current, reason }: { current: MatchSession; reason: RejectReason }) => {
-      if (!current.best || current.backups.length === 0) return { best: null, backups: [] }; // nothing left
+      if (!current.best || current.backups.length === 0) return { best: null, backups: [], emptyAfter: undefined }; // ran out
       const r = await matchApi.reject({
         criteria: current.criteria,
         reason,
         rejected_place_id: current.best.place_id,
         remaining: current.backups.map((b) => b.place_id),
       });
-      return { best: r.best, backups: r.backups ?? [] };
+      return { best: r.best, backups: r.backups ?? [], emptyAfter: r.best ? undefined : reason };
     },
     onSuccess: (r) => setSession((s) => (s ? { ...s, ...r } : s)),
   });
