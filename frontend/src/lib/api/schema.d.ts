@@ -84,6 +84,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/geo/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve
+         * @description Coordinates of the suggestion the user picked (404 `not_found` when the id is unknown).
+         */
+        get: operations["resolve_api_geo_resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/geo/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest
+         * @description Up to 10 suggestions for the text typed so far; `[]` below 2 characters (no VietMap call is made).
+         *
+         *     503 `geo_not_configured` when the server has no VietMap key, `geo_unavailable` when VietMap fails.
+         */
+        get: operations["suggest_api_geo_suggest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/groups": {
         parameters: {
             query?: never;
@@ -659,6 +701,28 @@ export interface components {
             lat: number;
             /** Lng */
             lng: number;
+        };
+        /**
+         * GeoSuggestionOut
+         * @description One line of the suggestion list shown under the address field.
+         */
+        GeoSuggestionOut: {
+            /**
+             * Address
+             * @description ward / district / city, shown under the name; may be empty
+             * @default
+             */
+            address: string;
+            /**
+             * Name
+             * @description short title: a place name, or house number + street
+             */
+            name: string;
+            /**
+             * Ref Id
+             * @description opaque id: pass it unchanged to `GET /api/geo/resolve`; do not store it
+             */
+            ref_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1521,6 +1585,90 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    resolve_api_geo_resolve_get: {
+        parameters: {
+            query: {
+                ref_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoPoint"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    suggest_api_geo_suggest_get: {
+        parameters: {
+            query: {
+                /** @description what the user has typed */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoSuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     google_maps_api_key: str = ""
     gemini_api_key: str = ""
 
+    # --- Geo: address search (suggestions + coordinates), called by the server only ---
+    vietmap_api_key: str = ""
+
     # --- M3/M4: offline LLM job (scripts/generate_insights.py). Never called while users browse. ---
     groq_api_key: str = ""
     # openai/gpt-oss-120b: wrote more specific, natural Vietnamese than 20b on the same places
