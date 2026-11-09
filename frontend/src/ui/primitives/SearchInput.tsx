@@ -30,7 +30,7 @@ export function SearchInput({ label, onSearch, className, ...rest }: SearchInput
       <button
         type="button"
         onClick={onSearch}
-        aria-label="Search"
+        aria-label="Tìm kiếm"
         className="inline-flex size-8 items-center justify-center rounded-full hover:bg-primary-soft"
       >
         <IconSearch className="size-4.5" aria-hidden />
