@@ -1,632 +1,475 @@
 "use client";
 
 /**
- * Explore screen views: props in, markup out. No data fetching here (see ExploreScreen).
- * Geometry note: the hero + map "stage" is an artboard with the mock-up's proportions
- * (833 x 638). Everything inside is positioned in % of it and text sizes use container-query
- * units (cqw), so the composition keeps its look at any desktop width.
+ * Explore (home) views: props in, markup out. No data fetching here (see ExploreScreen).
+ * Layout, top to bottom: short hero (one mascot), filters (search, price, categories), map, then the
+ * list of places, one page at a time. Place details: side panel on wide screens, draggable sheet
+ * otherwise.
  */
-import Image from "next/image";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import {
   BrushUnderline,
   Chip,
   HandNote,
-  IconArrowRight,
-  IconBack,
   IconButton,
   IconChevronRight,
+  IconClose,
   IconDirections,
-  IconGroup,
   IconHeart,
-  IconOpeningHours,
-  IconPayment,
   IconPin,
+  IconSearch,
+  IconSort,
   IconStar,
-  Badge,
+  IconWrite,
   Mascot,
-  PopLines,
+  Pagination,
   Rating,
   cn,
 } from "@/ui";
 
-import type { ExplorePlace } from "../mock";
 import type { MapPlace } from "@/features/map";
 
-export type FilterId = "nearby" | "top";
+import { PRICE_RANGES, SORTS, type SortId } from "../lib/listing";
 
-export const FILTERS: { id: FilterId; label: string; icon: ReactNode }[] = [
-  { id: "nearby", label: "Tất cả quán", icon: <IconPin className="size-4" aria-hidden /> },
-  { id: "top", label: "Đánh giá cao", icon: <IconStar className="size-4" aria-hidden /> },
-];
+const vnd = new Intl.NumberFormat("vi-VN");
 
-/** Absolute position in % of the parent: at(left, top, width?) */
-const at = (left: number, top: number, width?: number): CSSProperties => ({
-  position: "absolute",
-  left: `${left}%`,
-  top: `${top}%`,
-  ...(width !== undefined ? { width: `${width}%` } : {}),
-});
-/** Font size that scales with the stage width, never below `min` px. */
-const fluid = (cqw: number, min: number): CSSProperties => ({ fontSize: `max(${min}px, ${cqw}cqw)` });
+// =========================================================================== hero
 
-// =========================================================================== hero + map stage
-
-export function HeroHeadline({ lines, className, style }: { lines: string[]; className?: string; style?: CSSProperties }) {
+export function ExploreHero({ placeCount, area }: { placeCount: number | null; area: string }) {
   return (
-    <h1 className={cn("relative font-brand font-bold leading-[0.9] text-fg", className)} style={style}>
-      {lines.map((l, i) => (
-        <span key={l} className="block" style={{ paddingLeft: `${i * 0.08}em` }}>
-          {l}
-        </span>
-      ))}
-    </h1>
+    <section className="flex items-end justify-between gap-6" aria-labelledby="explore-title">
+      <div className="min-w-0">
+        <h1 id="explore-title" className="font-display text-2xl font-bold leading-tight text-fg sm:text-3xl md:text-4xl">
+          Khám phá quán ngon{" "}
+          <span className="relative inline-block whitespace-nowrap">
+            quanh bạn
+            <BrushUnderline className="absolute -bottom-1.5 left-0 h-3 w-full" />
+          </span>
+        </h1>
+        <p className="mt-3 hidden max-w-xl text-sm leading-relaxed text-fg-muted sm:block md:text-base">
+          {placeCount ? `${placeCount} quán ở ${area} được cộng đồng FoodMaps đánh giá. ` : ""}
+          Bấm vào ghim trên bản đồ để xem quán, hoặc mô tả món bạn muốn để được FoodMaps gợi ý.
+        </p>
+      </div>
+      <div className="hidden shrink-0 items-end gap-2 md:flex" aria-hidden>
+        <HandNote tilt={-8} className="mb-12 font-display text-lg font-semibold leading-snug">
+          Ăn ngon
+          <br />
+          là chân ái!
+        </HandNote>
+        <Mascot className="w-24" />
+      </div>
+    </section>
   );
 }
 
-export function FilterChips({
-  active,
-  onChange,
-  className,
-  style,
+// =========================================================================== filters
+
+export interface CategoryChip {
+  name: string;
+  icon: string;
+  count: number;
+}
+
+const control =
+  "h-10 rounded-control border border-border bg-surface px-3.5 text-sm text-fg shadow-card outline-none transition ease-standard focus:ring-2 focus:ring-primary";
+
+/** Text filter + price range: they narrow both the pins and the list. */
+export function SearchFilters({
+  query,
+  onQuery,
+  price,
+  onPrice,
 }: {
-  active: FilterId;
-  onChange: (f: FilterId) => void;
-  className?: string;
-  style?: CSSProperties;
+  query: string;
+  onQuery: (q: string) => void;
+  price: number;
+  onPrice: (i: number) => void;
 }) {
   return (
-    <div role="toolbar" aria-label="Filters" className={cn("flex flex-wrap gap-3.5", className)} style={style}>
-      {FILTERS.map((f) => (
-        <Chip key={f.id} selected={active === f.id} icon={f.icon} onClick={() => onChange(f.id)}>
-          {f.label}
+    <div className="flex gap-2" role="search" aria-label="Lọc quán">
+      <label className="relative min-w-0 flex-1">
+        <span className="sr-only">Lọc theo tên quán hoặc địa chỉ</span>
+        <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Lọc theo tên quán, địa chỉ…"
+          className={cn(control, "w-full pl-10")}
+          data-testid="place-filter"
+        />
+      </label>
+      <label className="flex shrink-0 items-center gap-2">
+        <span className="sr-only text-sm font-semibold text-fg-muted sm:not-sr-only">Giá</span>
+        <select
+          value={price}
+          onChange={(e) => onPrice(Number(e.target.value))}
+          aria-label="Khoảng giá mỗi người"
+          className={cn(control, "w-30 pr-7 sm:w-auto")}
+        >
+          {PRICE_RANGES.map((r, i) => (
+            <option key={r.label} value={i}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+export function CategoryChips({
+  categories,
+  total,
+  activeCategory,
+  onCategory,
+  topRated,
+  onTopRated,
+  showTopRated,
+}: {
+  categories: CategoryChip[];
+  total: number;
+  activeCategory: string | null;
+  onCategory: (name: string | null) => void;
+  topRated: boolean;
+  onTopRated: () => void;
+  /** hidden while no place has a rating (the filter would always be empty) */
+  showTopRated: boolean;
+}) {
+  return (
+    <div
+      role="toolbar"
+      aria-label="Danh mục"
+      className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&>button]:shrink-0"
+    >
+      <Chip selected={!activeCategory} onClick={() => onCategory(null)} icon={<IconPin className="size-4" aria-hidden />}>
+        Tất cả {total > 0 && <span className="tabular-nums opacity-70">{total}</span>}
+      </Chip>
+      {categories.map((c) => (
+        <Chip key={c.name} selected={activeCategory === c.name} onClick={() => onCategory(activeCategory === c.name ? null : c.name)}>
+          <span aria-hidden>{c.icon}</span>
+          {c.name} <span className="tabular-nums opacity-70">{c.count}</span>
         </Chip>
       ))}
+      {showTopRated && (
+        <Chip selected={topRated} onClick={onTopRated} title="Chỉ hiện quán từ 4.5 sao" icon={<IconStar className="size-4" aria-hidden />}>
+          Đánh giá cao
+        </Chip>
+      )}
     </div>
   );
 }
 
-export function HeroStage({
-  headline,
-  subtitle,
-  note,
-  filter,
-  onFilter,
-  map,
-}: {
-  headline: string[];
-  subtitle: string;
-  note: string[];
-  filter: FilterId;
-  onFilter: (f: FilterId) => void;
-  /** The map block. */
-  map: ReactNode;
-}) {
+// =========================================================================== map overlay
+
+export function PlaceEmoji({ icon, size = "md" }: { icon: string; size?: "sm" | "md" | "lg" }) {
   return (
-    <section
-      className="@container relative flex flex-col gap-4 px-4 pt-2 md:block md:aspect-[833/638] md:w-full md:px-0 md:pt-0"
-      aria-label="Explore"
+    <span
+      className={cn(
+        "grid shrink-0 place-items-center rounded-xl bg-primary-soft",
+        size === "sm" && "size-10 text-lg",
+        size === "md" && "size-11 text-xl",
+        size === "lg" && "size-14 text-2xl",
+      )}
+      aria-hidden
     >
-      <div className="flex items-start justify-between gap-2 md:hidden">
-        <HeroHeadline lines={headline} className="text-5xl" />
-        <Mascot className="mt-2 w-24" />
-      </div>
-      <p className="text-sm text-fg-muted md:hidden">{subtitle}</p>
-      <FilterChips
-        active={filter}
-        onChange={onFilter}
-        className="-mx-4 flex-nowrap! overflow-x-auto px-4 pb-1 md:hidden [&>button]:shrink-0"
-      />
+      {icon}
+    </span>
+  );
+}
 
-      <div className="relative aspect-[834/430] w-full overflow-hidden rounded-card md:absolute md:inset-x-0 md:bottom-0 md:top-[12.54%] md:aspect-auto">
-        {map}
-      </div>
+function RatingLine({ place, size = "sm" }: { place: MapPlace; size?: "sm" | "md" }) {
+  return place.avg_rating !== null && place.review_count > 0 ? (
+    <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} size={size} />
+  ) : (
+    <span className={cn("text-fg-muted", size === "sm" ? "text-xs" : "text-sm")}>Chưa có đánh giá</span>
+  );
+}
 
-      <div
-        className="hidden md:block"
-        style={{ ...at(4.8, 5.4), ...fluid(6.05, 34), letterSpacing: "0.02em", transform: "rotate(-3.5deg)", transformOrigin: "left top" }}
+/** Floating card over the map for the selected pin (narrow screens): opens the details. */
+export function PlacePreview({ place, icon, onOpen, onClose }: { place: MapPlace; icon: string; onOpen: () => void; onClose: () => void }) {
+  return (
+    <div className="relative" data-testid="map-preview">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-2.5 pr-10 text-left shadow-float transition ease-standard hover:bg-primary-soft"
       >
-        <HeroHeadline lines={headline} />
-      </div>
-      <div className="hidden md:block" style={{ ...at(5.2, 24.6, 28.4), height: "2.6%" }}>
-        <BrushUnderline className="size-full" />
-      </div>
-      <div className="hidden md:block" style={{ ...at(37.4, 9.6, 3.1), height: "8.4%" }}>
-        <PopLines className="size-full" />
-      </div>
-      <p className="hidden leading-snug text-fg-muted md:block" style={{ ...at(36.8, 26.6, 23), ...fluid(1.56, 12) }}>
-        {subtitle}
-      </p>
-
-      <div className="hidden md:block" style={{ ...at(59.4, 19.6, 3), height: "5%" }}>
-        <PopLines className="size-full" flip />
-      </div>
-      <div className="hidden md:block" style={at(63.9, 7.7, 20.3)}>
-        <Mascot className="w-full" title="FoodMaps mascot" />
-      </div>
-      <div className="hidden md:block" style={{ ...at(80.3, 4.1, 2.8), height: "4.5%" }}>
-        <svg viewBox="0 0 24 30" className="size-full" aria-hidden>
-          <path d="M8 3 L4 12 M20 16 L9 21" className="stroke-primary" strokeWidth="3.4" strokeLinecap="round" fill="none" />
-        </svg>
-      </div>
-      <div className="hidden text-center md:block" style={{ ...at(81.6, 1.8, 15), ...fluid(2.3, 14) }}>
-        <HandNote tilt={-24} className="leading-[1.05]">
-          {note.map((line) => (
-            <span key={line} className="block">
-              {line}
-            </span>
-          ))}
-        </HandNote>
-      </div>
-      <div className="hidden md:block" style={{ ...at(88, 2.8, 8.4), height: "16%" }}>
-        <svg viewBox="0 0 70 100" className="size-full" aria-hidden>
-          <path d="M55 4 C70 24 66 64 32 92 M32 92 L44 86 M32 92 L26 80" className="stroke-fg" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-        </svg>
-      </div>
-
-      <FilterChips
-        active={filter}
-        onChange={onFilter}
-        className="hidden flex-nowrap md:flex"
-        style={at(3.5, 33.7)}
-      />
-    </section>
-  );
-}
-
-/** Floating card over the map for the selected pin. */
-export function MapPreviewCard({ place, onOpen }: { place: ExplorePlace; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-2 pr-3 text-left shadow-float transition ease-standard hover:-translate-y-0.5"
-      data-testid="map-preview"
-    >
-      <span className="relative aspect-[88/70] w-[30%] shrink-0 overflow-hidden rounded-xl">
-        <Image src={place.thumb} alt="" fill sizes="96px" className="object-cover" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-sm font-bold text-fg">{place.name}</span>
-        <Rating value={place.rating} count={place.reviewCount} size="sm" />
-        <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
-          <IconPin className="size-3.5 fill-primary text-rating" aria-hidden />
-          {place.distance}
-        </span>
-      </span>
-      <IconChevronRight className="size-4 shrink-0 text-fg-muted" aria-hidden />
-    </button>
-  );
-}
-
-export function StoredPlacePreview({ place, onOpen }: { place: MapPlace; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-3 text-left shadow-float transition ease-standard hover:-translate-y-0.5"
-      data-testid="map-preview"
-    >
-      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
-        {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-sm font-bold text-fg">{place.name}</span>
-        <span className="truncate text-xs text-fg-muted">{place.category}</span>
-        {place.avg_rating !== null && place.review_count > 0 ? (
-          <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} size="sm" />
-        ) : (
-          <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
-        )}
-      </span>
-      <IconChevronRight className="size-4 shrink-0 text-fg-muted" aria-hidden />
-    </button>
-  );
-}
-
-export function StoredPlaceList({ places, onSelect }: { places: MapPlace[]; onSelect: (id: string) => void }) {
-  return (
-    <ul className="grid gap-2 sm:grid-cols-2">
-      {places.map((place) => (
-        <li key={place.place_id}>
-          <button
-            type="button"
-            onClick={() => onSelect(place.place_id)}
-            className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-3 text-left shadow-card hover:bg-primary-soft"
-          >
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
-              {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="truncate text-sm font-bold">{place.name}</span>
-              <span className="truncate text-xs text-fg-muted">{place.category}</span>
-            </span>
-            {place.avg_rating !== null && place.review_count > 0 ? (
-              <Rating value={place.avg_rating} size="sm" />
-            ) : (
-              <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function StoredPlaceGrid({
-  places,
-  savedIds,
-  onToggleSave,
-  onSelect,
-}: {
-  places: MapPlace[];
-  savedIds: ReadonlySet<string>;
-  onToggleSave: (id: string) => void;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <section className="rounded-card bg-surface px-4 pb-4 pt-3 shadow-card md:px-7" aria-label="Quán trong FoodMaps">
-      <SectionTitle title="Quán trong FoodMaps" action={`${places.length} quán`} />
-      {places.length === 0 ? (
-        <p className="py-6 text-center text-sm text-fg-muted">Chưa có quán nào trong khu vực dữ liệu.</p>
-      ) : (
-        <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {places.map((place) => (
-            <li key={place.place_id} className="relative rounded-xl bg-surface-raised p-3 shadow-card">
-              <button type="button" onClick={() => onSelect(place.place_id)} className="flex w-full items-center gap-3 pr-9 text-left">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-xl" aria-hidden>
-                  {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
-                </span>
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-sm font-semibold text-fg">{place.name}</span>
-                  <span className="truncate text-xs text-fg-muted">{place.category}</span>
-                  {place.avg_rating !== null ? (
-                    <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} size="sm" />
-                  ) : (
-                    <span className="text-xs text-fg-muted">Chưa có đánh giá</span>
-                  )}
-                </span>
-              </button>
-              <SaveButton
-                saved={savedIds.has(place.place_id)}
-                onToggle={() => onToggleSave(place.place_id)}
-                filled
-                className="absolute right-2 top-2"
-                size="sm"
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-export function StoredPlaceDetail({
-  place,
-  saved,
-  onToggleSave,
-  onBack,
-  directionsUrl,
-}: {
-  place: MapPlace;
-  saved: boolean;
-  onToggleSave: () => void;
-  onBack: () => void;
-  directionsUrl: string;
-}) {
-  return (
-    <article className="overflow-hidden rounded-sheet bg-surface p-5 shadow-sheet" data-testid="place-detail" aria-label={place.name}>
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary-soft text-2xl" aria-hidden>
-            {/cafe|cà phê|trà/i.test(place.category) ? "☕" : "🍽️"}
+        <PlaceEmoji icon={icon} size="sm" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-sm font-bold text-fg">{place.name}</span>
+          <span className="truncate text-xs text-fg-muted">
+            {place.category}
+            {place.price_per_person !== null && ` · ~${vnd.format(place.price_per_person)}đ`}
           </span>
-          <div className="min-w-0">
-            <h2 className="text-xl font-extrabold leading-tight text-fg">{place.name}</h2>
-            <p className="mt-1 text-sm text-fg-muted">{place.category}</p>
-          </div>
-        </div>
-        <SaveButton saved={saved} onToggle={onToggleSave} />
-      </header>
-
-      <div className="mt-4 flex flex-col gap-3 text-sm text-fg-muted">
-        {place.avg_rating !== null ? (
-          <Rating value={place.avg_rating} count={`${place.review_count} đánh giá`} />
-        ) : (
-          <span>Chưa có đánh giá</span>
-        )}
-        {place.address && (
-          <p>
-            <span className="font-semibold text-fg">Địa chỉ: </span>
-            {place.address}
-          </p>
-        )}
-        {place.price_per_person !== null && (
-          <p>
-            <span className="font-semibold text-fg">Giá tham khảo: </span>
-            {new Intl.NumberFormat("vi-VN").format(place.price_per_person)}đ/người
-          </p>
-        )}
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <button type="button" onClick={onBack} className="h-11 rounded-control bg-surface-raised font-semibold text-fg hover:bg-primary-soft">
-          Quay lại bản đồ
-        </button>
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-control bg-primary font-bold text-primary-fg shadow-card hover:brightness-95"
-        >
-          <IconDirections className="size-4.5 fill-fg" aria-hidden />
-          Chỉ đường
-        </a>
-      </div>
-    </article>
-  );
-}
-
-/** "List View": the same places as rows. */
-export function PlaceList({ places, onSelect }: { places: ExplorePlace[]; onSelect: (id: string) => void }) {
-  return (
-    <ul className="grid gap-2 sm:grid-cols-2">
-      {places.map((p) => (
-        <li key={p.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(p.id)}
-            className="flex w-full items-center gap-3 rounded-card bg-surface-raised p-2 text-left shadow-card hover:bg-primary-soft"
-          >
-            <span className="relative size-12 shrink-0 overflow-hidden rounded-lg">
-              <Image src={p.thumb} alt="" fill sizes="48px" className="object-cover" />
-            </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-bold">{p.name}</span>
-              <Rating value={p.rating} count={p.reviewCount} size="sm" />
-            </span>
-            <span className="ml-auto text-xs font-semibold">{p.distance}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// =========================================================================== section header
-
-export function SectionTitle({
-  title,
-  action,
-  onAction,
-  doodle = false,
-}: {
-  title: string;
-  action?: string;
-  onAction?: () => void;
-  /** small hand-drawn strokes after the title */
-  doodle?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <h2 className="flex items-center gap-1.5 text-lg font-extrabold text-fg">
-        <Mascot variant="flying" className="w-6" />
-        {title}
-        {doodle && <PopLines className="ml-2 h-5 w-3 -rotate-12 self-start" />}
-      </h2>
-      {action && (
-        <button type="button" onClick={onAction} className="inline-flex items-center gap-1 text-xs font-semibold text-fg-muted hover:text-fg">
-          {action} <IconArrowRight className="size-3.5" aria-hidden />
-        </button>
-      )}
+          <span className="text-xs font-semibold text-fg">Xem chi tiết</span>
+        </span>
+        <IconChevronRight className="size-4 shrink-0 text-fg-muted" aria-hidden />
+      </button>
+      <IconButton
+        variant="plain"
+        size="sm"
+        label="Bỏ chọn quán"
+        icon={<IconClose className="size-4" />}
+        onClick={onClose}
+        className="absolute right-1.5 top-1.5"
+      />
     </div>
   );
 }
 
-// =========================================================================== featured row
+// =========================================================================== list of places
 
-export function FeaturedThisWeek({
+export function PlaceGrid({
   places,
+  total,
+  iconOf,
+  selectedId,
   savedIds,
   onToggleSave,
   onSelect,
+  title,
+  sort,
+  onSort,
+  page,
+  pageCount,
+  firstIndex,
+  onPage,
+  onClearFilters,
 }: {
-  places: ExplorePlace[];
+  /** the places of the current page */
+  places: MapPlace[];
+  /** how many match the filters */
+  total: number;
+  iconOf: (p: MapPlace) => string;
+  selectedId: string | null;
   savedIds: ReadonlySet<string>;
-  onToggleSave: (id: string) => void;
+  onToggleSave: (p: MapPlace) => void;
   onSelect: (id: string) => void;
+  title: string;
+  sort: SortId;
+  onSort: (s: SortId) => void;
+  /** 1-based page, number of pages, index (0-based) of the first place of this page in the list */
+  page: number;
+  pageCount: number;
+  firstIndex: number;
+  onPage: (page: number) => void;
+  /** shown in the empty state when a filter is on */
+  onClearFilters?: () => void;
 }) {
   return (
-    <section className="rounded-card bg-surface px-4 pb-2.5 pt-3 shadow-card md:px-7" aria-label="Featured this week">
-      <SectionTitle title="Featured This Week" action="See all" doodle />
-      <ul className="mt-1.5 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-        {places.map((p) => (
-          <li key={p.id}>
-            <PlaceCard place={p} saved={savedIds.has(p.id)} onToggleSave={() => onToggleSave(p.id)} onSelect={() => onSelect(p.id)} />
-          </li>
-        ))}
-      </ul>
+    <section className="flex scroll-mt-20 flex-col gap-3 lg:scroll-mt-4" aria-labelledby="place-grid-title" id="place-list">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="place-grid-title" className="text-lg font-extrabold text-fg">
+          {title} <span className="text-sm font-semibold text-fg-muted">({total})</span>
+        </h2>
+        {total > 1 && (
+          <label className="flex items-center gap-2 text-sm text-fg-muted">
+            <IconSort className="size-4" aria-hidden />
+            <span className="sr-only">Sắp xếp</span>
+            <select value={sort} onChange={(e) => onSort(e.target.value as SortId)} className={cn(control, "h-9 pr-8")}>
+              {SORTS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      {total === 0 ? (
+        <div className="rounded-card bg-surface p-6 text-center text-sm text-fg-muted shadow-card">
+          <p className="font-semibold text-fg">Không có quán nào khớp bộ lọc</p>
+          <p className="mt-1">Thử bỏ bớt điều kiện, hoặc mô tả điều bạn muốn để AI tìm giúp.</p>
+          {onClearFilters && (
+            <button type="button" onClick={onClearFilters} className="mt-3 font-semibold text-fg underline">
+              Xoá bộ lọc
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            {places.map((place) => (
+              <li
+                key={place.place_id}
+                className={cn(
+                  "relative rounded-card bg-surface p-3 shadow-card transition ease-standard hover:-translate-y-0.5",
+                  selectedId === place.place_id && "ring-2 ring-primary",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(place.place_id)}
+                  className="flex w-full items-start gap-3 pr-9 text-left"
+                  aria-current={selectedId === place.place_id || undefined}
+                >
+                  <PlaceEmoji icon={iconOf(place)} />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate text-sm font-bold text-fg">{place.name}</span>
+                    <span className="truncate text-xs text-fg-muted">
+                      {place.category}
+                      {place.price_per_person !== null && ` · ~${vnd.format(place.price_per_person)}đ/người`}
+                    </span>
+                    {place.address && <span className="truncate text-xs text-fg-muted">{place.address}</span>}
+                  </span>
+                </button>
+                <SaveButton
+                  saved={savedIds.has(place.place_id)}
+                  onToggle={() => onToggleSave(place)}
+                  className="absolute right-2 top-2"
+                  size="sm"
+                />
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <Pagination page={page} pageCount={pageCount} onPage={onPage} label="Trang của danh sách quán" />
+            <p className="text-xs text-fg-muted" aria-live="polite">
+              Quán {firstIndex + 1}–{firstIndex + places.length} trong {total} quán
+            </p>
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
-function PlaceCard({
-  place,
-  saved,
-  onToggleSave,
-  onSelect,
-}: {
-  place: ExplorePlace;
-  saved: boolean;
-  onToggleSave: () => void;
-  onSelect: () => void;
-}) {
+export function PlaceGridSkeleton() {
   return (
-    <article className="relative overflow-hidden rounded-xl bg-surface-raised shadow-card" data-testid="featured-card">
-      <button type="button" onClick={onSelect} className="block w-full text-left">
-        <span className="relative block aspect-[180/70] w-full">
-          <Image src={place.photo} alt={place.name} fill sizes="(min-width: 768px) 18vw, 45vw" className="object-cover" />
-        </span>
-        <span className="flex flex-col gap-0.5 px-2.5 pb-2 pt-1.5">
-          <span className="truncate text-sm font-semibold text-fg">{place.name}</span>
-          <span className="flex items-center gap-1.5 text-xs text-fg-muted">
-            <Rating value={place.rating} count={place.reviewCount} size="sm" className="[&>span:first-of-type]:font-normal [&>span:first-of-type]:text-fg-muted" />
-            <span aria-hidden>·</span>
-            {place.cuisine}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3" aria-busy aria-label="Đang tải danh sách quán">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="flex gap-3 rounded-card bg-surface p-3 shadow-card" aria-hidden>
+          <span className="size-11 shrink-0 animate-pulse rounded-xl bg-primary-soft" />
+          <span className="flex flex-1 flex-col gap-2 py-1">
+            <span className="h-3.5 w-2/3 animate-pulse rounded-control bg-primary-soft" />
+            <span className="h-3 w-1/2 animate-pulse rounded-control bg-primary-soft" />
+            <span className="h-3 w-5/6 animate-pulse rounded-control bg-primary-soft" />
           </span>
-          <span className="text-xs font-bold text-fg">{place.distance}</span>
-        </span>
-      </button>
-      <SaveButton saved={saved} onToggle={onToggleSave} filled className="absolute right-2 top-2" size="sm" />
-    </article>
+        </div>
+      ))}
+    </div>
   );
 }
 
-/** Heart toggle. `filled`: dark heart on a white disc (cards); otherwise outline (dish tiles). */
+/** Heart toggle on a white disc. */
 export function SaveButton({
   saved,
   onToggle,
-  filled = false,
   className,
   size = "md",
 }: {
   saved: boolean;
   onToggle: () => void;
-  filled?: boolean;
   className?: string;
   size?: "sm" | "md";
 }) {
   return (
     <IconButton
-      label={saved ? "Remove from saved" : "Save"}
+      label={saved ? "Bỏ lưu quán" : "Lưu quán"}
       pressed={saved}
       size={size}
       onClick={onToggle}
       className={className}
-      icon={
-        <IconHeart
-          className={cn(
-            size === "sm" ? "size-4" : "size-5",
-            saved ? "fill-accent text-accent" : filled ? "fill-pin-neutral text-pin-neutral" : "text-fg",
-          )}
-          aria-hidden
-        />
-      }
+      icon={<IconHeart className={cn(size === "sm" ? "size-4" : "size-5", saved ? "fill-accent text-accent" : "text-fg")} aria-hidden />}
     />
   );
 }
 
-// =========================================================================== detail panel
+// =========================================================================== details
 
-export function PlaceDetailPanel({
+export function PlaceDetail({
   place,
+  icon,
   saved,
   onToggleSave,
-  onBack,
+  onWriteReview,
+  onClose,
   directionsUrl,
-  savedDishIds,
-  onToggleDish,
+  mapsUrl,
 }: {
-  place: ExplorePlace;
+  place: MapPlace;
+  icon: string;
   saved: boolean;
   onToggleSave: () => void;
-  onBack: () => void;
+  onWriteReview: () => void;
+  onClose: () => void;
   directionsUrl: string;
-  savedDishIds: ReadonlySet<string>;
-  onToggleDish: (id: string) => void;
+  mapsUrl: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-sheet bg-surface shadow-sheet" data-testid="place-detail" aria-label={place.name}>
-      <div className="relative aspect-[405/204] w-full">
-        <Image src={place.heroPhoto} alt={place.name} fill sizes="420px" className="object-cover" priority />
-        <IconButton label="Back" icon={<IconBack className="size-5" />} onClick={onBack} className="absolute left-4 top-4" />
-        <SaveButton saved={saved} onToggle={onToggleSave} className="absolute right-4 top-4" />
-        <span className="absolute bottom-3 right-4 rounded-control bg-overlay px-3 py-1 text-xs font-semibold text-surface">
-          1/{place.photoCount}
-        </span>
-      </div>
+    <article className="flex flex-col gap-4" data-testid="place-detail" aria-labelledby="place-detail-name">
+      <header className="flex items-start gap-3">
+        <PlaceEmoji icon={icon} size="lg" />
+        <div className="min-w-0 flex-1">
+          <h2 id="place-detail-name" className="text-xl font-extrabold leading-tight text-fg">
+            {place.name}
+          </h2>
+          <p className="mt-1 text-sm text-fg-muted">{place.category}</p>
+        </div>
+        <IconButton variant="plain" label="Đóng" icon={<IconClose className="size-5" />} onClick={onClose} />
+      </header>
 
-      <div className="flex flex-col gap-3.5 px-5 pb-4 pt-3.5">
-        <header className="flex gap-4">
-          <Mascot variant="round" className="mt-1 size-11" />
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="text-2xl font-extrabold leading-tight text-fg">{place.name}</h2>
-            <p className="text-sm text-fg-muted">{place.subtitle}</p>
-          </div>
-        </header>
-        <p className="-mt-2 flex items-center gap-2 pl-1 text-sm">
-          <Rating value={place.rating} count={`${place.reviewCount} reviews`} />
-          <span aria-hidden>•</span>
-          <span className="font-semibold">{place.distance}</span>
-        </p>
+      <dl className="flex flex-col gap-2.5 text-sm">
+        <Info label="Đánh giá">
+          <RatingLine place={place} size="md" />
+        </Info>
+        {place.price_per_person !== null && <Info label="Giá tham khảo">khoảng {vnd.format(place.price_per_person)}đ/người</Info>}
+        {place.address && <Info label="Địa chỉ">{place.address}</Info>}
+      </dl>
 
-        <ul className="flex flex-wrap gap-2" aria-label="Tags">
-          {place.tags.map((t) => (
-            <li key={t}>
-              <Badge>{t}</Badge>
-            </li>
-          ))}
-        </ul>
-
-        <p className="max-w-74 text-sm leading-relaxed text-fg-muted">{place.description}</p>
-
-        <ul className="flex flex-col gap-1.5 text-sm text-fg-muted">
-          <InfoRow icon={<IconOpeningHours className="size-4.5 text-fg" aria-hidden />}>
-            <span className="font-bold text-fg">Open</span> {place.openHours}
-          </InfoRow>
-          <InfoRow icon={<IconPayment className="size-4.5 text-fg" aria-hidden />}>{place.payment}</InfoRow>
-          <InfoRow icon={<IconGroup className="size-4.5 fill-fg text-fg" aria-hidden />}>{place.goodFor}</InfoRow>
-        </ul>
-
+      <div className="grid grid-cols-[1fr_auto] gap-2">
         <a
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-flex h-12 items-center justify-center gap-2 rounded-control bg-primary font-bold text-primary-fg shadow-card transition ease-standard hover:brightness-95"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-control bg-primary font-bold text-primary-fg shadow-card transition ease-standard hover:brightness-95"
         >
-          <IconDirections className="size-4.5 fill-fg" aria-hidden />
-          Get Directions
+          <IconDirections className="size-4.5" aria-hidden />
+          Chỉ đường
         </a>
-
-        {place.dishes.length > 0 && (
-          <section className="mt-1 flex flex-col gap-2.5" aria-label="Popular dishes">
-            <SectionTitle title="Popular Dishes" action="See all" />
-            <ul className="grid grid-cols-3 gap-3">
-              {place.dishes.map((d) => (
-                <li key={d.id} className="relative overflow-hidden rounded-xl bg-surface-raised shadow-card">
-                  <span className="relative block aspect-[112/78] w-full">
-                    <Image src={d.photo} alt={d.name} fill sizes="130px" className="object-cover" />
-                  </span>
-                  <span className="flex flex-col gap-0.5 px-2 pb-2 pt-1.5">
-                    <span className="truncate text-xs font-semibold text-fg">{d.name}</span>
-                    <span className="text-xs text-fg-muted">{d.price}</span>
-                  </span>
-                  <IconButton
-                    variant="plain"
-                    size="sm"
-                    label={savedDishIds.has(d.id) ? `Unsave ${d.name}` : `Save ${d.name}`}
-                    pressed={savedDishIds.has(d.id)}
-                    onClick={() => onToggleDish(d.id)}
-                    className="absolute right-1 top-1 text-surface-raised hover:bg-transparent"
-                    icon={<IconHeart className={cn("size-5 drop-shadow", savedDishIds.has(d.id) && "fill-accent text-accent")} aria-hidden />}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <button
+          type="button"
+          onClick={onToggleSave}
+          aria-pressed={saved}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-control border border-border bg-surface px-4 font-bold text-fg transition ease-standard hover:bg-primary-soft"
+        >
+          <IconHeart className={cn("size-4.5", saved && "fill-accent text-accent")} aria-hidden />
+          {saved ? "Đã lưu" : "Lưu"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <button type="button" onClick={onWriteReview} className="inline-flex items-center gap-1.5 font-semibold text-fg hover:underline">
+          <IconWrite className="size-4" aria-hidden /> Viết đánh giá
+        </button>
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-fg-muted hover:text-fg hover:underline">
+          Mở trên Google Maps ↗
+        </a>
       </div>
     </article>
   );
 }
 
-function InfoRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <li className="flex items-center gap-3">
-      {icon}
-      <span>{children}</span>
-    </li>
+    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
+      <dt className="font-semibold text-fg">{label}</dt>
+      <dd className="text-fg-muted">{children}</dd>
+    </div>
+  );
+}
+
+/** Side panel content when nothing is selected (wide screens). */
+export function DetailHint() {
+  return (
+    <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+      <span className="grid size-14 place-items-center rounded-full bg-primary-soft text-2xl" aria-hidden>
+        📍
+      </span>
+      <p className="font-bold text-fg">Chọn một quán để xem chi tiết</p>
+      <p className="text-sm text-fg-muted">Bấm vào ghim trên bản đồ hoặc một quán trong danh sách.</p>
+    </div>
   );
 }
