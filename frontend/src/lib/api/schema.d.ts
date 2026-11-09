@@ -164,6 +164,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/groups/{code}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview
+         * @description Public, no token: status, host name and member count, so the join page can explain a room
+         *     that cannot be joined (expired, started, full) before asking for a name. 404 if unknown.
+         */
+        get: operations["preview_api_groups__code__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/groups/{code}/start": {
         parameters: {
             query?: never;
@@ -1170,6 +1191,31 @@ export interface components {
              */
             suitable_for?: string[];
         };
+        /**
+         * RoomPreviewOut
+         * @description Public facts about a room, shown BEFORE joining (no token): lets the join page say "not
+         *     found / expired / already started / full" instead of asking for a name first.
+         */
+        RoomPreviewOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Host Name */
+            host_name: string;
+            /** Joinable */
+            joinable: boolean;
+            /** Participant Count */
+            participant_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "lobby" | "voting" | "decided" | "expired";
+        };
         /** RoomStateOut */
         RoomStateOut: {
             /**
@@ -1693,6 +1739,44 @@ export interface operations {
             };
             /** @description Gone */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_groups__code__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomPreviewOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

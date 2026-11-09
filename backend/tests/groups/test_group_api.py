@@ -288,6 +288,37 @@ async def test_state_includes_timing_fields(db_client):
 # --------------------------------------------------------------------------- expiry
 
 
+async def test_preview_without_token(db_client):
+    host = await create(db_client, "Host")
+    assert (await join(db_client, host["code"], "An")).status_code == 201
+    r = await db_client.get(f"/api/groups/{host['code'].lower()}/preview")  # no token, any case
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["code"] == host["code"] and p["status"] == "lobby"
+    assert p["host_name"] == "Host" and p["participant_count"] == 2 and p["joinable"] is True
+
+
+async def test_preview_unknown_room_is_404(db_client):
+    r = await db_client.get("/api/groups/ZZZZZZ/preview")
+    assert r.status_code == 404 and r.json()["error"]["code"] == "room_not_found"
+
+
+async def test_preview_started_full_and_expired_rooms_are_not_joinable(db_client, monkeypatch):
+    started = await create(db_client, "Host")
+    await start(db_client, started)
+    p = (await db_client.get(f"/api/groups/{started['code']}/preview")).json()
+    assert p["status"] == "voting" and p["joinable"] is False
+
+    monkeypatch.setattr(get_settings(), "group_max_participants", 1)
+    full = await create(db_client, "Solo")
+    assert (await db_client.get(f"/api/groups/{full['code']}/preview")).json()["joinable"] is False
+
+    old = await create(db_client, "Late")
+    await expire_now(old["code"])
+    p = (await db_client.get(f"/api/groups/{old['code']}/preview")).json()
+    assert p["status"] == "expired" and p["joinable"] is False
+
+
 async def test_expired_lobby(db_client):
     host = await create(db_client)
     await expire_now(host["code"])
