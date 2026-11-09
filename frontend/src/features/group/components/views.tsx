@@ -7,7 +7,7 @@
  */
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
-import { Badge, Button, Card, Input, ProgressBar } from "@/ui";
+import { Badge, Button, Card, IconDirections, Input, ProgressBar } from "@/ui";
 
 import type { Candidate, Participant } from "../api";
 
@@ -40,7 +40,7 @@ export function PlaceCardBody({ candidate }: { candidate: Candidate }) {
         <h3 className="font-display text-lg font-semibold" data-testid="place-name">
           {candidateTitle(candidate)}
         </h3>
-        <Badge tone="accent">{Math.round(candidate.match_score * 100)}% MATCH</Badge>
+        <Badge tone="accent">Hợp {Math.round(candidate.match_score * 100)}%</Badge>
       </div>
       <div className="flex flex-wrap gap-1">
         {candidate.tags.map((t) => (
@@ -70,6 +70,7 @@ export function MessageView({ title, text, action }: { title: string; text?: str
 /** Used both to create a room (host) and to join one (member). */
 export function NameForm({
   title,
+  description,
   submitLabel,
   onSubmit,
   loading,
@@ -77,6 +78,7 @@ export function NameForm({
   defaultName = "",
 }: {
   title: string;
+  description?: string;
   submitLabel: string;
   onSubmit: (name: string) => void;
   loading?: boolean;
@@ -91,12 +93,15 @@ export function NameForm({
   return (
     <Card>
       <form className="flex flex-col gap-4" onSubmit={submit}>
-        <h1 className="font-display text-xl font-semibold">{title}</h1>
+        <div>
+          <h2 className="font-display text-xl font-semibold">{title}</h2>
+          {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
+        </div>
         <Input
-          label="Tên của bạn"
+          label="Tên hiển thị trong phòng"
+          hint="Bạn bè sẽ thấy tên này"
           name="display_name"
           maxLength={30}
-          autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={error}
@@ -215,7 +220,7 @@ export function VoteDeckView({
           ♥ Thích
         </Button>
       </div>
-      <p className="text-center text-xs text-fg-muted">Phím ← bỏ qua · → thích</p>
+      <p className="hidden text-center text-xs text-fg-muted lg:block">Mẹo: phím ← để bỏ qua, → để thích</p>
     </section>
   );
 }
@@ -309,8 +314,9 @@ export function ResultView({
         href={directionsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex h-12 items-center justify-center rounded-control bg-primary px-6 font-medium text-primary-fg"
+        className="inline-flex h-12 items-center justify-center gap-2 rounded-control bg-primary px-6 font-bold text-primary-fg shadow-card"
       >
+        <IconDirections className="size-4.5" aria-hidden />
         Chỉ đường
       </a>
       <Button variant="ghost" onClick={onNewRoom}>
