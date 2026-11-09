@@ -25,6 +25,7 @@ from app.modules.groups.schemas import (
     CreateRoomIn,
     JoinRoomIn,
     ParticipantOut,
+    RoomPreviewOut,
     RoomStateOut,
     VoteIn,
 )
@@ -110,6 +111,30 @@ async def join_room(
         await db.rollback()
         raise AppError(409, "name_taken", "Tên này đã có người dùng trong phòng") from None
     return room, me, token
+
+
+async def preview_room(db: AsyncSession, code: str) -> RoomPreviewOut:
+    """What a visitor without a token may know about a room (404 if it does not exist)."""
+    room = await db.scalar(select(GroupRoom).where(GroupRoom.code == code.upper()))
+    if room is None:
+        raise AppError(404, "room_not_found", "Phòng không tồn tại")
+    await expire_if_needed(db, room)
+    count = await db.scalar(
+        select(func.count()).select_from(GroupParticipant).where(GroupParticipant.room_id == room.id)
+    )
+    host_name = await db.scalar(
+        select(GroupParticipant.display_name).where(
+            GroupParticipant.room_id == room.id, GroupParticipant.is_host
+        )
+    )
+    return RoomPreviewOut(
+        code=room.code,
+        status=room.status,
+        host_name=host_name or "",
+        participant_count=count,
+        joinable=room.status == "lobby" and count < get_settings().group_max_participants,
+        expires_at=room.expires_at,
+    )
 
 
 # --------------------------------------------------------------------------- authentication

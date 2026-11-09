@@ -9,7 +9,7 @@ const RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/cafe|cà phê|ca phe|coffee/i, "☕"],
   [/trà|tea|boba/i, "🧋"],
   [/bakery|bánh|banh/i, "🥐"],
-  [/dessert|tráng miệng|kem|ice/i, "🍨"],
+  [/dessert|tráng miệng|chè|kem|ice/i, "🍨"],
   [/bar|pub|beer|bia/i, "🍺"],
   [/noodle|phở|pho|bún|bun|mì/i, "🍜"],
 ];

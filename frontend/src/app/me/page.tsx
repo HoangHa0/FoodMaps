@@ -1,3 +1,7 @@
-export default function MyTastePage() {
-  return <main className="p-6">My Taste / saved places: placeholder (data from M2 and M4).</main>;
+import { SavedScreen } from "@/features/saved";
+
+export const metadata = { title: "Quán đã lưu" };
+
+export default function SavedPage() {
+  return <SavedScreen />;
 }

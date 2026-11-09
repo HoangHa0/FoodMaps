@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 
 import "@fontsource/nunito-sans/400.css";
 import "@fontsource/nunito-sans/600.css";
@@ -17,26 +16,14 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "FoodMaps",
+  title: { default: "FoodMaps · Khám phá quán ngon quanh bạn", template: "%s · FoodMaps" },
   description: "Quyết định nên ăn ở đâu — một mình, theo lịch trình, hay cùng nhóm bạn.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="vi" data-theme={ACTIVE_THEME} className="h-full antialiased">
-      <head>
-        {/* Nạp VietMap GL CSS */}
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.css"
-        />
-        {/* Nạp VietMap GL JS SDK */}
-        <Script
-          id="vietmap-gl-js"
-          src="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.js"
-          strategy="afterInteractive"
-        />
-      </head>
+      {/* VietMap GL JS is loaded by <VietMap /> itself, only on pages that show a map */}
       <body className="min-h-full flex flex-col">
         <Providers>
           <AppShell>{children}</AppShell>

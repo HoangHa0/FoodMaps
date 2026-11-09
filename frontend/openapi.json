@@ -1396,6 +1396,52 @@
         "title": "ReviewUpdateIn",
         "type": "object"
       },
+      "RoomPreviewOut": {
+        "description": "Public facts about a room, shown BEFORE joining (no token): lets the join page say \"not\nfound / expired / already started / full\" instead of asking for a name first.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "host_name": {
+            "title": "Host Name",
+            "type": "string"
+          },
+          "joinable": {
+            "title": "Joinable",
+            "type": "boolean"
+          },
+          "participant_count": {
+            "title": "Participant Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "lobby",
+              "voting",
+              "decided",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "status",
+          "host_name",
+          "participant_count",
+          "joinable",
+          "expires_at"
+        ],
+        "title": "RoomPreviewOut",
+        "type": "object"
+      },
       "RoomStateOut": {
         "properties": {
           "candidates": {
@@ -2361,6 +2407,52 @@
           }
         },
         "summary": "Join Room",
+        "tags": [
+          "M5 group session"
+        ]
+      }
+    },
+    "/api/groups/{code}/preview": {
+      "get": {
+        "description": "Public, no token: status, host name and member count, so the join page can explain a room\nthat cannot be joined (expired, started, full) before asking for a name. 404 if unknown.",
+        "operationId": "preview_api_groups__code__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
         "tags": [
           "M5 group session"
         ]

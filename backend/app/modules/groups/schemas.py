@@ -33,6 +33,18 @@ class JoinedOut(BaseModel):
     is_host: bool
 
 
+class RoomPreviewOut(BaseModel):
+    """Public facts about a room, shown BEFORE joining (no token): lets the join page say "not
+    found / expired / already started / full" instead of asking for a name first."""
+
+    code: str
+    status: RoomStatus
+    host_name: str
+    participant_count: int
+    joinable: bool  # lobby and not full
+    expires_at: datetime
+
+
 class StartIn(BaseModel):
     criteria: MatchCriteria
 

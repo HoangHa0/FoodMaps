@@ -1,3 +1,2 @@
-/** Public API of the explore feature (home screen layout; data from M2/M3/M7 later). */
+/** Public API of the explore feature (home screen: map, filters, list and details of the places). */
 export { ExploreScreen } from "./components/ExploreScreen";
-export type { ExplorePlace } from "./mock";
