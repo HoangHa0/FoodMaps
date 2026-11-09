@@ -33,6 +33,7 @@ export function RequireAuthProvider({ children }: { children: ReactNode }) {
     <GuardContext.Provider value={guard}>
       {children}
       <Sheet open={pending !== null} onClose={() => setPending(null)} title="Đăng nhập để tiếp tục" modal>
+        <p className="-mt-1 mb-4 text-sm text-fg-muted">Lưu quán và viết đánh giá cần một tài khoản. Đăng nhập xong, việc bạn vừa chọn sẽ được thực hiện tiếp.</p>
         <LoginForm
           next={pathname} // "Đăng ký" leaves the sheet: come back to this page afterwards
           onSuccess={() => {
