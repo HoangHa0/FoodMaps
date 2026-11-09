@@ -1,9 +1,9 @@
 "use client";
 
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 
 import { useMe, useRequireAuth } from "@/features/auth";
-import { Button, Card, cn, Input, Spinner } from "@/ui";
+import { Button, Card, cn, Input, Spinner, useToast } from "@/ui";
 
 import type { Review } from "../api";
 import { useDeleteReview, useSaveReview } from "../hooks/useReviewMutations";
@@ -24,14 +24,17 @@ import { SuitableForPicker } from "./SuitableForPicker";
  * Review form for one place (M4). Guests see a login prompt; a user who already reviewed the
  * place gets the form pre-filled and saving edits that review (one review per user per place).
  * Mount it anywhere a place is shown:  <ReviewForm placeId={place.place_id} placeName={name} />
+ * `bare`: no card frame and no heading, for a Sheet that already has its own title.
  */
 export function ReviewForm({
   placeId,
   placeName,
   onSaved,
+  bare = false,
 }: {
   placeId: string;
   placeName?: string;
+  bare?: boolean;
   /** Called after a successful save or delete, e.g. to close the sheet the form sits in. */
   onSaved?: () => void;
 }) {
@@ -41,36 +44,41 @@ export function ReviewForm({
   // Bumped after a delete so the fields remount empty
   const [resetKey, setResetKey] = useState(0);
 
-  const title = placeName ? `Review ${placeName}` : "Viết review";
+  const title = placeName ? `Đánh giá ${placeName}` : "Viết đánh giá";
+  const frame = (className: string, children: ReactNode) =>
+    bare ? <div className={className}>{children}</div> : <Card className={className}>{children}</Card>;
 
   if (meLoading || (me && mine.isPending)) {
-    return (
-      <Card className="flex justify-center py-6">
+    return frame(
+      "flex justify-center py-6",
+      <>
         <Spinner />
-      </Card>
+      </>,
     );
   }
 
   if (!me) {
-    return (
-      <Card className="flex flex-col gap-3">
-        <h2 className="font-display text-lg font-semibold">{title}</h2>
+    return frame(
+      "flex flex-col gap-3",
+      <>
+        {!bare && <h2 className="font-display text-lg font-semibold">{title}</h2>}
         <p className="text-sm text-fg-muted">Đăng nhập để chia sẻ trải nghiệm của bạn về quán này.</p>
-        <Button onClick={() => guard(() => undefined)}>Đăng nhập để viết review</Button>
-      </Card>
+        <Button onClick={() => guard(() => undefined)}>Đăng nhập để viết đánh giá</Button>
+      </>,
     );
   }
 
   if (mine.isError) {
-    return (
-      <Card className="flex flex-col gap-3">
+    return frame(
+      "flex flex-col gap-3",
+      <>
         <p role="alert" className="text-sm text-danger">
           {mine.error.message}
         </p>
         <Button variant="secondary" onClick={() => void mine.refetch()}>
           Thử lại
         </Button>
-      </Card>
+      </>,
     );
   }
 
@@ -79,6 +87,7 @@ export function ReviewForm({
       key={resetKey}
       placeId={placeId}
       title={title}
+      bare={bare}
       existing={mine.data}
       onSaved={onSaved}
       onDeleted={() => {
@@ -92,12 +101,14 @@ export function ReviewForm({
 function ReviewFields({
   placeId,
   title,
+  bare,
   existing,
   onSaved,
   onDeleted,
 }: {
   placeId: string;
   title: string;
+  bare: boolean;
   existing: Review | null | undefined;
   onSaved?: () => void;
   onDeleted: () => void;
@@ -108,6 +119,8 @@ function ReviewFields({
   const save = useSaveReview(placeId, existing);
   const remove = useDeleteReview(placeId);
   const commentId = useId();
+  const toast = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const set = <K extends keyof ReviewValues>(key: K, value: ReviewValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
@@ -119,18 +132,37 @@ function ReviewFields({
     e.preventDefault();
     setSubmitted(true);
     if (!allScoresChosen(values) || Object.keys(validate(values)).length > 0) return;
-    save.mutate(toBody(values), { onSuccess: () => onSaved?.() });
+    save.mutate(toBody(values), {
+      onSuccess: (r) => {
+        toast(
+          r.status === "flagged"
+            ? "Đã lưu. Đánh giá đang được kiểm duyệt nên tạm thời chỉ bạn thấy."
+            : existing
+              ? "Đã cập nhật đánh giá của bạn"
+              : "Cảm ơn bạn! Đánh giá đã được đăng",
+        );
+        onSaved?.();
+      },
+    });
   }
 
   function onDelete() {
-    if (!existing || !window.confirm("Xoá review này? Bạn không thể hoàn tác.")) return;
-    remove.mutate(existing.id, { onSuccess: onDeleted });
+    if (!existing) return;
+    remove.mutate(existing.id, {
+      onSuccess: () => {
+        toast("Đã xoá đánh giá", { tone: "info" });
+        onDeleted();
+      },
+    });
   }
 
+  const Frame = bare ? "div" : Card;
   return (
-    <Card>
+    <Frame>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <h2 className="font-display text-lg font-semibold">{existing ? "Sửa review của bạn" : title}</h2>
+        {(!bare || existing) && (
+          <h2 className="font-display text-lg font-semibold">{existing ? "Sửa đánh giá của bạn" : title}</h2>
+        )}
         <p className="text-sm text-fg-muted">
           <span className="text-danger">*</span> Bắt buộc. Các mục còn lại bạn có thể bỏ trống.
         </p>
@@ -203,22 +235,37 @@ function ReviewFields({
         {save.isSuccess && (
           <p role="status" className="text-sm text-success">
             {save.data.status === "flagged"
-              ? "Đã lưu. Review của bạn đang được kiểm duyệt nên chỉ mình bạn thấy."
-              : "Đã lưu review của bạn."}
+              ? "Đã lưu. Đánh giá của bạn đang được kiểm duyệt nên chỉ mình bạn thấy."
+              : "Đã lưu đánh giá của bạn."}
           </p>
         )}
 
-        <div className="flex gap-2">
-          <Button type="submit" fullWidth loading={save.isPending} disabled={!allScoresChosen(values)}>
-            {existing ? "Lưu thay đổi" : "Đăng review"}
-          </Button>
-          {existing && (
-            <Button type="button" variant="danger" loading={remove.isPending} onClick={onDelete}>
-              Xoá
+        {confirmDelete ? (
+          <div className="flex flex-col gap-2 rounded-card border border-danger/40 p-3" role="alertdialog" aria-label="Xác nhận xoá đánh giá">
+            <p className="text-sm font-semibold">Xoá đánh giá này? Bạn không thể hoàn tác.</p>
+            <div className="flex gap-2">
+              <Button type="button" variant="danger" loading={remove.isPending} onClick={onDelete}>
+                Xoá đánh giá
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setConfirmDelete(false)}>
+                Giữ lại
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {/* never disabled: a press on an incomplete form shows what is missing */}
+            <Button type="submit" size="lg" fullWidth loading={save.isPending}>
+              {existing ? "Lưu thay đổi" : "Đăng đánh giá"}
             </Button>
-          )}
-        </div>
+            {existing && (
+              <Button type="button" variant="secondary" size="lg" onClick={() => setConfirmDelete(true)}>
+                Xoá
+              </Button>
+            )}
+          </div>
+        )}
       </form>
-    </Card>
+    </Frame>
   );
 }
