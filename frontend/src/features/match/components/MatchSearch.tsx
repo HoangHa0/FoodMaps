@@ -1,23 +1,29 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 
+import { useRequireAuth } from "@/features/auth";
+import { placeHref } from "@/features/map";
 import { ReviewForm } from "@/features/reviews";
-import { Sheet } from "@/ui";
+import { useSavedPlaces } from "@/features/saved";
+import { Portal, Sheet } from "@/ui";
 
 import type { MatchCriteria } from "../api";
 import { useMatchSearch, useWhy } from "../hooks/useMatchSearch";
 import { directionsUrl } from "../lib/options";
 import { MatchOverlay, MatchResultSheet, SearchTrigger } from "./views";
 
+const OpenContext = createContext<(() => void) | null>(null);
+
 /**
- * Container of AI Match (M3 UI), mounted once in the top bar so it lives across pages:
- *   collapsed bar -> full-screen overlay (mood + options) -> bottom sheet with ONE place over the
- *   map, "Why this place?", directions, "Không hợp" (4 reasons -> rerank of the backups) and a
- *   review form (M4). A search started on another page returns to the map (home) first.
+ * AI Match (M3 UI), mounted once around the app so it lives across pages:
+ *   any trigger (top bar on desktop, round button of the phone tab bar) -> full-screen overlay
+ *   (mood + options) -> draggable sheet with ONE place over the map, "Vì sao hợp với bạn?",
+ *   directions, save, "Không hợp" (4 reasons -> rerank of the backups) and a review form (M4).
+ * The result opens the home map on that place (/?quan=<place_id>).
  */
-export function MatchSearch() {
+export function MatchSearchProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { session, search, reject, rejectCurrent, close } = useMatchSearch();
@@ -25,56 +31,85 @@ export function MatchSearch() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const best = session?.best ?? null;
   const why = useWhy(best?.place_id, session?.criteria.mood);
+  const { savedIds, toggle: toggleSave } = useSavedPlaces();
+  const guard = useRequireAuth(); // guests log in first, then the review form opens
 
   const openOverlay = useCallback(() => setOverlayOpen(true), []);
   const closeOverlay = useCallback(() => setOverlayOpen(false), []);
 
+  function showOnMap(placeId: string | undefined) {
+    if (placeId) router.replace(placeHref(placeId), { scroll: false });
+    else if (pathname !== "/") router.push("/");
+  }
+
   function submit(criteria: MatchCriteria) {
     search.mutate(criteria, {
-      onSuccess: () => {
+      onSuccess: (s) => {
         setOverlayOpen(false);
-        if (pathname !== "/") router.push("/"); // the result floats over the map
+        showOnMap(s.best?.place_id); // the result floats over the map, on that place
       },
     });
   }
 
+  function onReject(reason: Parameters<typeof rejectCurrent>[0]) {
+    rejectCurrent(reason);
+  }
+
   return (
-    <>
-      <SearchTrigger onOpen={openOverlay} />
+    <OpenContext.Provider value={openOverlay}>
+      {children}
 
-      {overlayOpen && (
-        <MatchOverlay
-          initial={session?.criteria}
-          onSubmit={submit}
-          onClose={closeOverlay}
-          loading={search.isPending}
-          error={search.error?.message}
-        />
-      )}
+      {/* portal: these fixed layers must not be positioned inside a sticky / blurred ancestor */}
+      <Portal>
+        {overlayOpen && (
+          <MatchOverlay
+            initial={session?.criteria}
+            onSubmit={submit}
+            onClose={closeOverlay}
+            loading={search.isPending}
+            error={search.error?.message}
+          />
+        )}
 
-      {session && !overlayOpen && !reviewOpen && (
-        <MatchResultSheet
-          result={best}
-          backupsLeft={session.backups.length}
-          emptyAfter={session.emptyAfter}
-          why={why.data}
-          whyLoading={why.isLoading}
-          directionsUrl={best ? directionsUrl(best.place_id, best.name) : ""}
-          onClose={close}
-          onSearchAgain={openOverlay}
-          onReject={rejectCurrent}
-          rejecting={reject.isPending}
-          rejectError={reject.error?.message}
-          onWriteReview={() => setReviewOpen(true)}
-        />
-      )}
+        {session && !overlayOpen && !reviewOpen && (
+          <MatchResultSheet
+            result={best}
+            backupsLeft={session.backups.length}
+            emptyAfter={session.emptyAfter}
+            why={why.data}
+            whyLoading={why.isLoading}
+            directionsUrl={best ? directionsUrl(best.place_id, best.name) : ""}
+            onClose={close}
+            onSearchAgain={openOverlay}
+            onReject={onReject}
+            rejecting={reject.isPending}
+            rejectError={reject.error?.message}
+            onWriteReview={() => guard(() => setReviewOpen(true))}
+            onShowOnMap={() => best && showOnMap(best.place_id)}
+            saved={!!best && savedIds.has(best.place_id)}
+            onToggleSave={() => best && toggleSave(best.place_id, best.name ?? undefined)}
+          />
+        )}
 
-      {best && (
-        <Sheet open={reviewOpen} onClose={() => setReviewOpen(false)} modal>
-          {/* ReviewForm handles guests itself (login sheet), then edits or creates the user's review */}
-          <ReviewForm placeId={best.place_id} placeName={best.name ?? undefined} onSaved={() => setReviewOpen(false)} />
-        </Sheet>
-      )}
-    </>
+        {best && (
+          <Sheet open={reviewOpen} onClose={() => setReviewOpen(false)} title={`Đánh giá ${best.name ?? "quán"}`} modal>
+            {/* ReviewForm handles guests itself (login sheet), then edits or creates the user's review */}
+            <ReviewForm placeId={best.place_id} onSaved={() => setReviewOpen(false)} bare />
+          </Sheet>
+        )}
+      </Portal>
+    </OpenContext.Provider>
   );
+}
+
+/** Opens the AI search overlay (for buttons outside the match feature, e.g. the phone tab bar). */
+export function useOpenMatchSearch(): () => void {
+  const open = useContext(OpenContext);
+  return useMemo(() => open ?? (() => {}), [open]);
+}
+
+/** The search bar of the desktop top bar. */
+export function MatchSearchBar() {
+  const open = useOpenMatchSearch();
+  return <SearchTrigger onOpen={open} />;
 }

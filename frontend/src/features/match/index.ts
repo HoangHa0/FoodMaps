@@ -1,5 +1,7 @@
 /**
  * Public API of the match feature (AI Match UI; backend M3).
- *   MatchSearch - collapsed search bar -> overlay -> result bottom sheet. Mounted in the top bar.
+ *   MatchSearchProvider - wraps the app: overlay + result sheet, shared by every trigger
+ *   MatchSearchBar      - the search bar of the desktop top bar
+ *   useOpenMatchSearch  - open the overlay from anywhere (phone tab bar button)
  */
-export { MatchSearch } from "./components/MatchSearch";
+export { MatchSearchBar, MatchSearchProvider, useOpenMatchSearch } from "./components/MatchSearch";

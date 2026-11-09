@@ -1,7 +1,7 @@
 import type { RejectReason } from "../api";
 
 /** Quick suggestions under the mood field (spec 1.1): a tap adds the words to the sentence. */
-export const MOOD_CHIPS = ["Date", "Học bài", "Đói bụng", "Dưới 100k", "Comfort food", "Ăn khuya", "Ngồi một mình", "Đi nhóm"];
+export const MOOD_CHIPS = ["Hẹn hò", "Học bài", "Đói bụng", "Dưới 100k", "Món quen thuộc", "Ăn khuya", "Ngồi một mình", "Đi nhóm"];
 
 /** Radius options; they only apply when a starting point is known (the backend needs `origin`). */
 export const RADII = [500, 1000, 2000, 5000];
