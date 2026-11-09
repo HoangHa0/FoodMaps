@@ -45,7 +45,7 @@ export function MatchSearchProvider({ children }: { children: ReactNode }) {
 
   function submit(criteria: MatchCriteria, origin: Origin | null) {
     search.mutate({ criteria, origin }, {
-      onSuccess: () => {
+      onSuccess: (s) => {
         setOverlayOpen(false);
         showOnMap(s.best?.place_id); // the result floats over the map, on that place
       },
@@ -65,6 +65,7 @@ export function MatchSearchProvider({ children }: { children: ReactNode }) {
         {overlayOpen && (
           <MatchOverlay
             initial={session?.criteria}
+            initialOrigin={session?.origin}
             onSubmit={submit}
             onClose={closeOverlay}
             loading={search.isPending}
@@ -77,6 +78,7 @@ export function MatchSearchProvider({ children }: { children: ReactNode }) {
             result={best}
             backupsLeft={session.backups.length}
             emptyAfter={session.emptyAfter}
+            originLabel={session.origin && session.origin.source !== "gps" ? session.origin.label : undefined}
             why={why.data}
             whyLoading={why.isLoading}
             directionsUrl={best ? directionsUrl(best.place_id, best.name) : ""}
