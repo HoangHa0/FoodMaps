@@ -229,6 +229,33 @@
         "title": "GeoPoint",
         "type": "object"
       },
+      "GeoSuggestionOut": {
+        "description": "One line of the suggestion list shown under the address field.",
+        "properties": {
+          "address": {
+            "default": "",
+            "description": "ward / district / city, shown under the name; may be empty",
+            "title": "Address",
+            "type": "string"
+          },
+          "name": {
+            "description": "short title: a place name, or house number + street",
+            "title": "Name",
+            "type": "string"
+          },
+          "ref_id": {
+            "description": "opaque id: pass it unchanged to `GET /api/geo/resolve`; do not store it",
+            "title": "Ref Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref_id",
+          "name"
+        ],
+        "title": "GeoSuggestionOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2042,6 +2069,110 @@
         "summary": "Register",
         "tags": [
           "M1 auth"
+        ]
+      }
+    },
+    "/api/geo/resolve": {
+      "get": {
+        "description": "Coordinates of the suggestion the user picked (404 `not_found` when the id is unknown).",
+        "operationId": "resolve_api_geo_resolve_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ref_id",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Ref Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeoPoint"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Resolve",
+        "tags": [
+          "geo address search"
+        ]
+      }
+    },
+    "/api/geo/suggest": {
+      "get": {
+        "description": "Up to 10 suggestions for the text typed so far; `[]` below 2 characters (no VietMap call is made).\n\n503 `geo_not_configured` when the server has no VietMap key, `geo_unavailable` when VietMap fails.",
+        "operationId": "suggest_api_geo_suggest_get",
+        "parameters": [
+          {
+            "description": "what the user has typed",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "what the user has typed",
+              "maxLength": 100,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GeoSuggestionOut"
+                  },
+                  "title": "Response Suggest Api Geo Suggest Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Suggest",
+        "tags": [
+          "geo address search"
         ]
       }
     },

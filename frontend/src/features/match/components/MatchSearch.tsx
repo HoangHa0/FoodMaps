@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 
 import { useRequireAuth } from "@/features/auth";
 import { placeHref } from "@/features/map";
+import type { Origin } from "@/features/places";
 import { ReviewForm } from "@/features/reviews";
 import { useSavedPlaces } from "@/features/saved";
 import { Portal, Sheet } from "@/ui";
@@ -42,9 +43,9 @@ export function MatchSearchProvider({ children }: { children: ReactNode }) {
     else if (pathname !== "/") router.push("/");
   }
 
-  function submit(criteria: MatchCriteria) {
-    search.mutate(criteria, {
-      onSuccess: (s) => {
+  function submit(criteria: MatchCriteria, origin: Origin | null) {
+    search.mutate({ criteria, origin }, {
+      onSuccess: () => {
         setOverlayOpen(false);
         showOnMap(s.best?.place_id); // the result floats over the map, on that place
       },

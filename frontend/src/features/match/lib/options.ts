@@ -24,7 +24,8 @@ export const BUDGETS: Budget[] = [
 
 /** The 4 quick reasons of "Không hợp" (spec 1.3), in the order they are shown. */
 /** Shown when "Không hợp" leaves nothing. */
-export const EMPTY_MESSAGE = "Không còn quán nào khớp tiêu chí. Thử mô tả khác hoặc nới bán kính, khoảng giá nhé.";
+export const EMPTY_MESSAGE =
+  "Không còn quán nào khớp tiêu chí. Thử mô tả khác, nới bán kính, khoảng giá hoặc đổi khu vực nhé.";
 
 /**
  * Only these two reasons remove places (the server drops backups that are not cheaper / closer than the
