@@ -9,6 +9,7 @@ import {
   IconLocate,
   IconMinus,
   IconPlus,
+  useToast,
 } from "@/ui";
 import type { MapPlace } from "./api";
 import { readToken, usePlacesLayer } from "./hooks/usePlacesLayer";
@@ -76,9 +77,9 @@ function loadVietMap(): Promise<VietMapGL> {
     script.async = true;
     script.onload = () => {
       if (window.vietmapgl) resolve(window.vietmapgl);
-      else reject(new Error("VietMap GL JS did not expose its browser API."));
+      else reject(new Error("Thư viện bản đồ VietMap không khởi tạo được."));
     };
-    script.onerror = () => reject(new Error("Could not load the VietMap GL JS library."));
+    script.onerror = () => reject(new Error("Không tải được thư viện bản đồ VietMap. Kiểm tra kết nối mạng."));
     document.head.append(script);
   }).catch((error: unknown) => {
     libraryPromise = undefined;
@@ -108,9 +109,10 @@ export function VietMap({
   onBackgroundClick?: () => void;
   savedIds?: ReadonlySet<string>;
   preview?: React.ReactNode;
-  listView: boolean;
-  onToggleList: () => void;
-  list: React.ReactNode;
+  /** Optional "list inside the map" toggle: shown only when all three are given. */
+  listView?: boolean;
+  onToggleList?: () => void;
+  list?: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<VietMapInstance | null>(null);
@@ -121,6 +123,7 @@ export function VietMap({
   const [placesMap, setPlacesMap] = useState<PlacesMap | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const toast = useToast();
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -146,7 +149,7 @@ export function VietMap({
         });
         mapRef.current = instance;
         instance.resize();
-        instance.addControl(new vietmapgl.NavigationControl({ showCompass: false }), "top-right");
+        // no NavigationControl: the zoom / locate buttons below are the map's only controls
         instance.on("style.load", () => {
           if (active) {
             instance?.resize();
@@ -155,19 +158,19 @@ export function VietMap({
             setPlacesMap(instance as unknown as PlacesMap);
           }
         });
-                instance.on("error", (event) => {
-                  // A missing font file or glyph range is not a broken map: names may not draw, the pins still do.
-                  const detail = `${(event.error as { url?: string } | undefined)?.url ?? ""} ${event.error?.message ?? ""}`;
-                  if (detail.includes("/fonts/")) {
-                    console.warn("[VietMap] glyph request failed:", detail.trim());
-                    return;
-                  }
-                  if (active) {
-                    setError(
-                      "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
-                    );
-                  }
-                });
+        instance.on("error", (event) => {
+          // A missing font file or glyph range is not a broken map: names may not draw, the pins still do.
+          const detail = `${(event.error as { url?: string } | undefined)?.url ?? ""} ${event.error?.message ?? ""}`;
+          if (detail.includes("/fonts/")) {
+            console.warn("[VietMap] glyph request failed:", detail.trim());
+            return;
+          }
+          if (active) {
+            setError(
+              "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
+            );
+          }
+        });
       })
       .catch((cause: unknown) => {
         if (active) {
@@ -231,16 +234,17 @@ export function VietMap({
 
   usePlacesLayer({ map: placesMap, places, selectedId, savedIds, options: layerOptions });
 
+  // A location problem is not a map problem: say it in a toast, keep the map as it is
   function locate() {
     if (!navigator.geolocation) {
-      setError("Trình duyệt không hỗ trợ lấy vị trí.");
+      toast("Trình duyệt không hỗ trợ lấy vị trí.", { tone: "error" });
       return;
     }
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         mapRef.current?.flyTo({ center: [coords.longitude, coords.latitude], zoom: 15 });
       },
-      () => setError("Không lấy được vị trí. Hãy kiểm tra quyền truy cập vị trí."),
+      () => toast("Không lấy được vị trí. Hãy cho phép trình duyệt truy cập vị trí.", { tone: "error" }),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
     );
   }
@@ -268,36 +272,43 @@ export function VietMap({
       )}
 
       {!listView && preview && (
-        <div className="absolute left-3 top-3 z-10 hidden w-[min(34%,280px)] md:block">
+        <div className="absolute inset-x-3 top-3 z-10 md:right-auto md:w-[min(42%,300px)]">
           {preview}
         </div>
       )}
 
-      {listView && (
-        <div className="absolute inset-x-0 bottom-0 top-[35%] z-10 overflow-y-auto rounded-b-card bg-bg/95 p-4">
+      {listView && list && (
+        <div className="absolute inset-0 z-10 overflow-y-auto bg-bg/95 p-4 pb-20">
           {list}
         </div>
       )}
 
       <div className="absolute right-3 top-3 z-10 hidden w-10 flex-col overflow-hidden rounded-control bg-surface-raised shadow-float md:flex">
-        <IconButton variant="plain" label="Zoom in" icon={<IconPlus className="size-5" />} className="w-full rounded-none" onClick={() => mapRef.current?.zoomIn()} />
+        <IconButton variant="plain" label="Phóng to" icon={<IconPlus className="size-5" />} className="w-full rounded-none" onClick={() => mapRef.current?.zoomIn()} />
         <span className="mx-2 h-px bg-border" aria-hidden />
-        <IconButton variant="plain" label="Zoom out" icon={<IconMinus className="size-5" />} className="w-full rounded-none" onClick={() => mapRef.current?.zoomOut()} />
+        <IconButton variant="plain" label="Thu nhỏ" icon={<IconMinus className="size-5" />} className="w-full rounded-none" onClick={() => mapRef.current?.zoomOut()} />
         <span className="mx-2 h-px bg-border" aria-hidden />
-        <IconButton variant="plain" label="My location" icon={<IconLocate className="size-5" />} className="w-full rounded-none" onClick={locate} />
+        <IconButton variant="plain" label="Vị trí của tôi" icon={<IconLocate className="size-5" />} className="w-full rounded-none" onClick={locate} />
       </div>
 
-      {/* bottom-9, not bottom-3: the map's own attribution sits in the bottom corner and must stay visible */}
-      <button
-        type="button"
-        onClick={onToggleList}
-        aria-pressed={listView}
-        className="absolute bottom-9 right-3 z-20 inline-flex h-9 items-center gap-2 rounded-control bg-surface-raised px-4 text-sm font-semibold shadow-float transition ease-standard hover:bg-primary-soft"
-      >
-        <IconList className="size-4" aria-hidden />
-        {listView ? "Map View" : "List View"}
-        <IconChevronRight className={listView ? "size-4 rotate-90" : "size-4 -rotate-90"} aria-hidden />
-      </button>
+      {/* phones: pinch to zoom, so only "my location" is shown */}
+      <IconButton label="Vị trí của tôi" icon={<IconLocate className="size-5" />} className="absolute bottom-9 right-3 z-10 md:hidden" onClick={locate} />
+
+      {onToggleList && (
+        <>
+          {/* bottom-9, not bottom-3: the map's own attribution sits in the bottom corner and must stay visible */}
+          <button
+            type="button"
+            onClick={onToggleList}
+            aria-pressed={listView}
+            className="absolute bottom-9 right-3 z-20 inline-flex h-9 items-center gap-2 rounded-control bg-surface-raised px-4 text-sm font-semibold shadow-float transition ease-standard hover:bg-primary-soft"
+          >
+            <IconList className="size-4" aria-hidden />
+            {listView ? "Xem bản đồ" : "Xem danh sách"}
+            <IconChevronRight className={listView ? "size-4 rotate-90" : "size-4 -rotate-90"} aria-hidden />
+          </button>
+        </>
+      )}
     </div>
   );
 }
