@@ -394,6 +394,7 @@ export function PlaceDetail({
   onClose,
   directionsUrl,
   mapsUrl,
+  insights,
 }: {
   place: MapPlace;
   icon: string;
@@ -403,6 +404,8 @@ export function PlaceDetail({
   onClose: () => void;
   directionsUrl: string;
   mapsUrl: string;
+  /** AI summary block (rendered by the container, from the match feature) */
+  insights?: ReactNode;
 }) {
   return (
     <article className="flex flex-col gap-4" data-testid="place-detail" aria-labelledby="place-detail-name">
@@ -453,6 +456,7 @@ export function PlaceDetail({
           Mở trên Google Maps ↗
         </a>
       </div>
+      {insights}
     </article>
   );
 }

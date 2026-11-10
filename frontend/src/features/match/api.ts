@@ -6,6 +6,7 @@ export type MatchResult = Schemas["MatchResult"];
 export type MatchResponse = Schemas["MatchResponse"];
 export type RejectReason = Schemas["RejectReason"];
 export type WhyOut = Schemas["WhyOut"];
+export type InsightsOut = Schemas["InsightsOut"];
 
 /** M3 API calls (guests allowed). Hooks and components never call `api.*` directly. */
 export const matchApi = {
@@ -22,4 +23,11 @@ export const matchApi = {
         params: { path: { place_id: placeId }, query: { mood } },
       }),
     ),
+
+  /**
+   * AI summary, pros/cons, answers to the preset questions and most mentioned dishes of one place,
+   * written offline (no LLM at request time). 404 = no insights for this place yet.
+   */
+  insights: async (placeId: string) =>
+    unwrap(await api.GET("/api/match/{place_id}/insights", { params: { path: { place_id: placeId } } })),
 };
