@@ -6,6 +6,7 @@
  * list of places, one page at a time. Place details: side panel on wide screens, draggable sheet
  * otherwise.
  */
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
@@ -20,6 +21,7 @@ import {
   IconPin,
   IconSort,
   IconStar,
+  IconTrips,
   IconWrite,
   Mascot,
   Pagination,
@@ -27,10 +29,9 @@ import {
   cn,
 } from "@/ui";
 
-import type { MapPlace } from "@/features/map";
+import { type MapPlace, PlaceSearchBox, type PlaceSuggestion } from "@/features/map";
 
 import { PRICE_RANGES, SORTS, type SortId } from "../lib/listing";
-import { PlaceSearchBox, type PlaceSuggestion } from "./PlaceSearchBox";
 
 const vnd = new Intl.NumberFormat("vi-VN");
 
@@ -103,6 +104,7 @@ export function SearchFilters({
         onQuery={onQuery}
         suggestions={suggestions}
         matchCount={matchCount}
+        onShowAll={() => document.getElementById("place-list")?.scrollIntoView({ behavior: "smooth", block: "start" })}
         onPick={onPick}
         className="flex-1"
       />
@@ -391,6 +393,8 @@ export function PlaceDetail({
   saved,
   onToggleSave,
   onWriteReview,
+  onAddToJourney,
+  inJourney,
   onClose,
   directionsUrl,
   mapsUrl,
@@ -402,6 +406,10 @@ export function PlaceDetail({
   saved: boolean;
   onToggleSave: () => void;
   onWriteReview: () => void;
+  /** "Thêm vào chuyến đi": adds the place to the journey being planned */
+  onAddToJourney?: () => void;
+  /** the place is already a stop of that journey */
+  inJourney?: boolean;
   onClose: () => void;
   directionsUrl: string;
   mapsUrl: string;
@@ -455,6 +463,7 @@ export function PlaceDetail({
         <button type="button" onClick={onWriteReview} className="inline-flex items-center gap-1.5 font-semibold text-fg hover:underline">
           <IconWrite className="size-4" aria-hidden /> Viết đánh giá
         </button>
+        {onAddToJourney && <JourneyLink inJourney={!!inJourney} onAdd={onAddToJourney} />}
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-fg-muted hover:text-fg hover:underline">
           Mở trên Google Maps ↗
         </a>
@@ -462,6 +471,22 @@ export function PlaceDetail({
       {insights}
       {reviews}
     </article>
+  );
+}
+
+/** "Thêm vào chuyến đi", or a link to the journey when the place is already one of its stops. */
+function JourneyLink({ inJourney, onAdd }: { inJourney: boolean; onAdd: () => void }) {
+  if (inJourney) {
+    return (
+      <Link href="/journey" className="inline-flex items-center gap-1.5 font-semibold text-fg-muted hover:text-fg hover:underline">
+        <IconTrips className="size-4" aria-hidden /> Đã có trong chuyến đi
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onAdd} className="inline-flex items-center gap-1.5 font-semibold text-fg hover:underline" data-testid="add-to-journey">
+      <IconTrips className="size-4" aria-hidden /> Thêm vào chuyến đi
+    </button>
   );
 }
 

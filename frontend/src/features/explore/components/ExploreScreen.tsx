@@ -11,17 +11,20 @@ import {
   type MapPlace,
   normalizeCategory,
   PLACE_PARAM,
+  queryScore,
+  suggestPlaces,
   usePlaces,
   VietMap,
 } from "@/features/map";
 import { useRequireAuth } from "@/features/auth";
+import { addPlaceToJourney, MAX_STOPS_PER_JOURNEY, useJourneyDraft } from "@/features/journey";
 import { PlaceInsights } from "@/features/match";
 import { ReviewForm, ReviewList } from "@/features/reviews";
 import { useSavedPlaces } from "@/features/saved";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { BottomSheet, Sheet } from "@/ui";
+import { BottomSheet, Sheet, useToast } from "@/ui";
 
-import { inPriceRange, PAGE_SIZE, queryScore, type SortId, sortPlaces, suggestPlaces } from "../lib/listing";
+import { inPriceRange, PAGE_SIZE, type SortId, sortPlaces } from "../lib/listing";
 import {
   CategoryChips,
   DetailHint,
@@ -61,6 +64,8 @@ export function ExploreScreen() {
   const isWide = useMediaQuery("(min-width: 1280px)");
   const mapRef = useRef<HTMLDivElement>(null);
   const guard = useRequireAuth(); // guests log in first, then the review form opens
+  const toast = useToast();
+  const journey = useJourneyDraft(); // "Thêm vào chuyến đi" adds to the journey being planned
 
   const [query, setQuery] = useState("");
   const [price, setPrice] = useState(0);
@@ -171,6 +176,12 @@ export function ExploreScreen() {
       saved={savedIds.has(selected.place_id)}
       onToggleSave={() => toggleSave(selected.place_id, selected.name)}
       onWriteReview={() => guard(() => setReviewOpen(true))}
+      inJourney={journey.stops.some((s) => s.place_id === selected.place_id)}
+      onAddToJourney={() => {
+        const r = addPlaceToJourney(selected.place_id);
+        if (r === "full") toast(`Chuyến đi đã đủ ${MAX_STOPS_PER_JOURNEY} điểm dừng.`, { tone: "error" });
+        else toast(`Đã thêm “${selected.name}” vào chuyến đi (${journey.stops.length + 1} điểm)`, { action: { label: "Xem", href: "/journey" } });
+      }}
       onClose={clearSelection}
       directionsUrl={directionsUrl(selected)}
       mapsUrl={mapsUrl(selected)}
