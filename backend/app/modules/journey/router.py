@@ -18,8 +18,8 @@ from app.modules.journey.schemas import (
     JourneyOut,
     JourneySummaryOut,
     ShareCreatedOut,
-    ShareIn,
     SharedJourneyOut,
+    ShareIn,
 )
 from app.shared.auth import CurrentUser
 
