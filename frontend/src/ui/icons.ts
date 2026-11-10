@@ -20,6 +20,7 @@ export {
   Crown as IconHost,
   Eye as IconShowPassword,
   EyeOff as IconHidePassword,
+  Flag as IconReport,
   Flame as IconTrending,
   Heart as IconHeart,
   House as IconHome,
