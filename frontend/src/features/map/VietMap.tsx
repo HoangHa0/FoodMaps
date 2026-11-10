@@ -53,6 +53,20 @@ declare global {
 
 let libraryPromise: Promise<VietMapGL> | undefined;
 
+/**
+ * What to tell the user when the map cannot start. The SDK's own errors are technical (a WebGL
+ * failure arrives as a JSON dump), so they are replaced by a sentence that says what to do.
+ */
+function mapStartError(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (/webgl/i.test(message)) {
+    return "Trình duyệt chưa hiển thị được bản đồ (WebGL đang bị tắt hoặc tạm bị chặn). Hãy thử tải lại; nếu vẫn lỗi, bật “Tăng tốc phần cứng” trong cài đặt trình duyệt. Danh sách quán bên dưới vẫn dùng được.";
+  }
+  // our own loader errors are already written for users (see loadVietMap)
+  if (/^(Không|Thư viện)/.test(message)) return message;
+  return "Không tải được bản đồ. Hãy kiểm tra kết nối mạng rồi thử tải lại.";
+}
+
 function loadVietMap(): Promise<VietMapGL> {
   if (window.vietmapgl) return Promise.resolve(window.vietmapgl);
   if (libraryPromise) return libraryPromise;
@@ -166,15 +180,19 @@ export function VietMap({
             return;
           }
           if (active) {
+            console.error("[VietMap] map error:", event.error);
             setError(
-              "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
+              /webgl/i.test(detail)
+                ? mapStartError(event.error)
+                : "VietMap không tải được dữ liệu nền. Kiểm tra quyền Tile API key và domain localhost trong VietMap.",
             );
           }
         });
       })
       .catch((cause: unknown) => {
         if (active) {
-          setError(cause instanceof Error ? cause.message : "Không tải được bản đồ VietMap.");
+          console.error("[VietMap] map could not start:", cause); // the technical details stay in the console
+          setError(mapStartError(cause));
         }
       });
 

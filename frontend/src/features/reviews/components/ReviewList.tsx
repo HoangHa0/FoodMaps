@@ -6,6 +6,7 @@ import { Badge, Button, Rating, Spinner } from "@/ui";
 
 import type { Review } from "../api";
 import { useReviewList } from "../hooks/useReviewList";
+import { ReportButton } from "./ReportButton";
 
 const dateFormat = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" });
 
@@ -17,7 +18,7 @@ function averageScore(r: Review): number {
 /**
  * Reviews that users wrote on the website for one place, newest first (guests can read).
  * Reviews imported from the team's form are never listed by the API. The author's own review gets
- * an edit button that calls `onEdit` (the parent opens the review form).
+ * an edit button that calls `onEdit` (the parent opens the review form); everyone else's gets "Báo cáo".
  * React escapes the text, so a review cannot inject markup.
  */
 export function ReviewList({ placeId, onEdit }: { placeId: string; onEdit?: () => void }) {
@@ -60,7 +61,10 @@ export function ReviewList({ placeId, onEdit }: { placeId: string; onEdit?: () =
                   <span className="min-w-0 truncate text-sm font-semibold text-fg">{r.author ?? "Ẩn danh"}</span>
                   <Rating value={averageScore(r)} size="sm" />
                 </div>
-                <p className="text-xs text-fg-muted">{dateFormat.format(new Date(r.created_at))}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-fg-muted">{dateFormat.format(new Date(r.created_at))}</p>
+                  {!r.is_mine && <ReportButton reviewId={r.id} placeId={placeId} author={r.author} />}
+                </div>
                 {r.comment && <p className="whitespace-pre-line text-sm leading-relaxed text-fg">{r.comment}</p>}
                 {r.recommended_dishes.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">

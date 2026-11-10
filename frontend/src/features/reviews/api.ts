@@ -4,6 +4,7 @@ import { unwrap } from "@/lib/api/errors";
 export type Review = Schemas["ReviewOut"];
 /** What the form sends: the 4 scores, comment and optional tags/price (same for POST and PUT). */
 export type ReviewBody = Schemas["ReviewUpdateIn"];
+export type ReportReason = Schemas["ReportIn"]["reason"];
 
 /** M4 API calls. Hooks and components never call `api.*` directly. */
 export const reviewsApi = {
@@ -19,6 +20,14 @@ export const reviewsApi = {
   create: async (body: Schemas["ReviewIn"]) => unwrap(await api.POST("/api/reviews", { body })),
   update: async (reviewId: string, body: ReviewBody) =>
     unwrap(await api.PUT("/api/reviews/{review_id}", { params: { path: { review_id: reviewId } }, body })),
+  /** "Báo cáo" (login required). 409 already_reported, 422 cannot_report_own, 404 no longer public. */
+  report: async (reviewId: string, reason: ReportReason, note: string | null) =>
+    unwrap(
+      await api.POST("/api/reviews/{review_id}/report", {
+        params: { path: { review_id: reviewId } },
+        body: { reason, note },
+      }),
+    ),
   remove: async (reviewId: string) => {
     unwrap(await api.DELETE("/api/reviews/{review_id}", { params: { path: { review_id: reviewId } } }));
   },
