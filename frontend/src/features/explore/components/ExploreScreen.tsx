@@ -16,7 +16,7 @@ import {
 } from "@/features/map";
 import { useRequireAuth } from "@/features/auth";
 import { PlaceInsights } from "@/features/match";
-import { ReviewForm } from "@/features/reviews";
+import { ReviewForm, ReviewList } from "@/features/reviews";
 import { useSavedPlaces } from "@/features/saved";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { BottomSheet, Sheet } from "@/ui";
@@ -175,6 +175,7 @@ export function ExploreScreen() {
       directionsUrl={directionsUrl(selected)}
       mapsUrl={mapsUrl(selected)}
       insights={<PlaceInsights key={selected.place_id} placeId={selected.place_id} />}
+      reviews={<ReviewList placeId={selected.place_id} onEdit={() => guard(() => setReviewOpen(true))} />}
     />
   );
 
