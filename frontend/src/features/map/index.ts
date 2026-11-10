@@ -12,3 +12,5 @@ export {
   placeHref,
 } from "./lib/categories";
 export { categoryIcon } from "./lib/categoryIcons";
+export { fold, highlightParts, queryScore, suggestPlaces } from "./lib/search";
+export { PlaceSearchBox, type PlaceSuggestion } from "./components/PlaceSearchBox";

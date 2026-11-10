@@ -4,39 +4,53 @@ import { type KeyboardEvent, useId, useRef, useState } from "react";
 
 import { IconClose, IconSearch, cn } from "@/ui";
 
-import type { MapPlace } from "@/features/map";
-
-import { highlightParts } from "../lib/listing";
+import type { MapPlace } from "../api";
+import { highlightParts } from "../lib/search";
 
 export interface PlaceSuggestion {
   place: MapPlace;
   icon: string;
-  /** hidden by another filter (category, price, rating): picking it clears those filters */
-  outside: boolean;
+  /** hidden by another filter (category, price, rating): shown with a "ngoài bộ lọc" tag */
+  outside?: boolean;
 }
 
 /**
  * Search field for place NAMES (not the AI search), as a combobox:
- *   - typing filters the pins and the list live, and shows up to 6 places under the field
- *   - ↑ ↓ move through them, Enter opens the highlighted place, Esc closes the list (then clears)
- *   - the last row keeps the plain filter: "Xem cả N kết quả trong danh sách"
+ *   - shows up to 6 places under the field while typing (see `suggestPlaces`)
+ *   - ↑ ↓ move through them, Enter picks the highlighted place, Esc closes the list (then clears)
+ *   - with `onShowAll`, a last row "Xem cả N kết quả trong danh sách" (the home screen's plain filter)
+ *   - with `clearOnPick`, the text is emptied after a pick (the journey planner adds one stop per pick)
  * Only UI state lives here (open, highlighted row); the places come from the container.
  */
 export function PlaceSearchBox({
   query,
   onQuery,
   suggestions,
-  matchCount,
+  matchCount = 0,
+  onShowAll,
   onPick,
+  clearOnPick = false,
+  label = "Tìm quán theo tên hoặc địa chỉ",
+  placeholder = "Tìm quán theo tên, địa chỉ…",
+  emptyHint = "Thử tên khác, hoặc dùng tìm kiếm AI để mô tả điều bạn muốn.",
   className,
+  "data-testid": testId = "place-filter",
 }: {
   query: string;
   onQuery: (q: string) => void;
   suggestions: PlaceSuggestion[];
-  /** how many places the text matches (all of them are in the list below) */
-  matchCount: number;
+  /** how many places the text matches (shown in the "show all" row) */
+  matchCount?: number;
+  /** adds the "show all results" row; called when it is pressed */
+  onShowAll?: () => void;
   onPick: (placeId: string) => void;
+  clearOnPick?: boolean;
+  label?: string;
+  placeholder?: string;
+  /** second sentence of the "no match" line */
+  emptyHint?: string;
   className?: string;
+  "data-testid"?: string;
 }) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,9 +64,13 @@ export function PlaceSearchBox({
     const s = suggestions[i];
     if (!s) return;
     onPick(s.place.place_id);
-    setOpen(false);
     setActive(-1);
-    inputRef.current?.blur(); // phones: hide the keyboard so the map and the details show
+    if (clearOnPick) {
+      onQuery(""); // ready for the next one; the field keeps the focus
+    } else {
+      setOpen(false);
+      inputRef.current?.blur(); // phones: hide the keyboard so the map and the details show
+    }
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -88,7 +106,7 @@ export function PlaceSearchBox({
         ref={inputRef}
         type="text"
         role="combobox"
-        aria-label="Tìm quán theo tên hoặc địa chỉ"
+        aria-label={label}
         aria-autocomplete="list"
         aria-expanded={showList}
         aria-controls={listId}
@@ -105,9 +123,9 @@ export function PlaceSearchBox({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
-        placeholder="Tìm quán theo tên, địa chỉ…"
+        placeholder={placeholder}
         className="h-10 w-full rounded-control border border-border bg-surface pl-10 pr-10 text-sm text-fg shadow-card outline-none transition ease-standard focus:ring-2 focus:ring-primary"
-        data-testid="place-filter"
+        data-testid={testId}
       />
       {hasText && (
         <button
@@ -174,20 +192,22 @@ export function PlaceSearchBox({
         </ul>
         {suggestions.length === 0 ? (
           <p className="px-4 py-3 text-sm text-fg-muted" role="status">
-            Không có quán nào khớp “{query.trim()}”. Thử tên khác, hoặc dùng tìm kiếm AI để mô tả điều bạn muốn.
+            Không có quán nào khớp “{query.trim()}”. {emptyHint}
           </p>
         ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              document.getElementById("place-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-            className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-left text-sm font-semibold text-fg hover:bg-primary-soft"
-          >
-            Xem cả {matchCount} kết quả trong danh sách
-            <span aria-hidden>↓</span>
-          </button>
+          onShowAll && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onShowAll();
+              }}
+              className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-left text-sm font-semibold text-fg hover:bg-primary-soft"
+            >
+              Xem cả {matchCount} kết quả trong danh sách
+              <span aria-hidden>↓</span>
+            </button>
+          )
         )}
       </div>
     </div>
