@@ -5,3 +5,5 @@
  *   useOpenMatchSearch  - open the overlay from anywhere (phone tab bar button)
  */
 export { MatchSearchBar, MatchSearchProvider, useOpenMatchSearch } from "./components/MatchSearch";
+/** PlaceInsights - AI summary block of one place (pros/cons, questions, dishes); any place screen can show it */
+export { PlaceInsights } from "./components/PlaceInsights";

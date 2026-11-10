@@ -15,6 +15,7 @@ import {
   VietMap,
 } from "@/features/map";
 import { useRequireAuth } from "@/features/auth";
+import { PlaceInsights } from "@/features/match";
 import { ReviewForm } from "@/features/reviews";
 import { useSavedPlaces } from "@/features/saved";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -173,6 +174,7 @@ export function ExploreScreen() {
       onClose={clearSelection}
       directionsUrl={directionsUrl(selected)}
       mapsUrl={mapsUrl(selected)}
+      insights={<PlaceInsights key={selected.place_id} placeId={selected.place_id} />}
     />
   );
 
