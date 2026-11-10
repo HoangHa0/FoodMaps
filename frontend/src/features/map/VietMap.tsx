@@ -96,6 +96,7 @@ export function VietMap({
   onSelect,
   onBackgroundClick,
   savedIds,
+  savedIcons,
   preview,
   listView,
   onToggleList,
@@ -108,6 +109,8 @@ export function VietMap({
   /** Click on empty map. */
   onBackgroundClick?: () => void;
   savedIds?: ReadonlySet<string>;
+  /** place_id -> icon of the list that holds the saved place */
+  savedIcons?: ReadonlyMap<string, string>
   preview?: React.ReactNode;
   /** Optional "list inside the map" toggle: shown only when all three are given. */
   listView?: boolean;
@@ -232,7 +235,14 @@ export function VietMap({
     [handleSelect, handleBackground],
   );
 
-  usePlacesLayer({ map: placesMap, places, selectedId, savedIds, options: layerOptions });
+    usePlacesLayer({
+      map: placesMap,
+      places,
+      selectedId,
+      savedIds,
+      iconByPlace: savedIcons,
+      options: layerOptions,
+    });
 
   // A location problem is not a map problem: say it in a toast, keep the map as it is
   function locate() {

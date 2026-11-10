@@ -11,12 +11,13 @@ import {
   type MapPlace,
   normalizeCategory,
   PLACE_PARAM,
+  SaveSheet,
   usePlaces,
+  useSavedMap,
   VietMap,
 } from "@/features/map";
 import { useRequireAuth } from "@/features/auth";
 import { ReviewForm } from "@/features/reviews";
-import { useSavedPlaces } from "@/features/saved";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { BottomSheet, Sheet } from "@/ui";
 
@@ -48,7 +49,8 @@ function mapsUrl(p: MapPlace): string {
  * Container of the home screen: places from the API; filters (category in the URL so the sidebar and
  * the chips agree; text, price and "Đánh giá cao" local) that narrow both the pins and the list; the
  * list sorted and shown one page at a time; the selected place (also from ?quan=, e.g. an AI result
- * or "Đã lưu"); saved hearts (M2 API) and the review form.
+ * or "Đã lưu"); saved hearts (the heart opens the save sheet to pick or change the list) and the
+ * review form.
  */
 export function ExploreScreen() {
   const router = useRouter();
@@ -56,10 +58,10 @@ export function ExploreScreen() {
   const activeCategory = params.get(CATEGORY_PARAM);
   const placeParam = params.get(PLACE_PARAM);
   const places = usePlaces();
-  const { savedIds, toggle: toggleSave } = useSavedPlaces();
+  const { savedIds, iconByPlace, savedByPlace } = useSavedMap();
   const isWide = useMediaQuery("(min-width: 1280px)");
   const mapRef = useRef<HTMLDivElement>(null);
-  const guard = useRequireAuth(); // guests log in first, then the review form opens
+  const guard = useRequireAuth(); // guests log in first, then the action runs
 
   const [query, setQuery] = useState("");
   const [price, setPrice] = useState(0);
@@ -68,6 +70,10 @@ export function ExploreScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(placeParam);
   const [detailOpen, setDetailOpen] = useState(placeParam !== null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [sheetPlaceId, setSheetPlaceId] = useState<string | null>(null); // place whose save sheet is open
+
+  // the heart: guests log in first; then pick the list (not saved yet) or change / remove it (saved)
+  const toggleSave = (id: string) => guard(() => setSheetPlaceId(id));
 
   // ?quan= changed while on this page (an AI result): show that place, clear the local filters
   const [seenParam, setSeenParam] = useState(placeParam);
@@ -149,7 +155,7 @@ export function ExploreScreen() {
       place={selected}
       icon={iconOf(selected)}
       saved={savedIds.has(selected.place_id)}
-      onToggleSave={() => toggleSave(selected.place_id, selected.name)}
+      onToggleSave={() => toggleSave(selected.place_id)}
       onWriteReview={() => guard(() => setReviewOpen(true))}
       onClose={clearSelection}
       directionsUrl={directionsUrl(selected)}
@@ -182,6 +188,7 @@ export function ExploreScreen() {
             onSelect={(id) => select(id, "map")}
             onBackgroundClick={clearSelection}
             savedIds={savedIds}
+            savedIcons={iconByPlace}
             preview={
               selected && !isWide && !detailOpen ? (
                 <PlacePreview place={selected} icon={iconOf(selected)} onOpen={() => setDetailOpen(true)} onClose={clearSelection} />
@@ -213,7 +220,7 @@ export function ExploreScreen() {
             iconOf={iconOf}
             selectedId={selectedId}
             savedIds={savedIds}
-            onToggleSave={(p) => toggleSave(p.place_id, p.name)}
+            onToggleSave={(p) => toggleSave(p.place_id)}
             onSelect={(id) => select(id, "list")}
             sort={sort}
             onSort={setSort}
@@ -247,6 +254,17 @@ export function ExploreScreen() {
         <Sheet open={reviewOpen} onClose={() => setReviewOpen(false)} title={`Đánh giá ${selected.name}`} modal>
           <ReviewForm placeId={selected.place_id} onSaved={() => setReviewOpen(false)} bare />
         </Sheet>
+      )}
+
+      {sheetPlaceId && (
+        <SaveSheet
+          key={sheetPlaceId}
+          open
+          onClose={() => setSheetPlaceId(null)}
+          placeId={sheetPlaceId}
+          placeName={all.find((p) => p.place_id === sheetPlaceId)?.name ?? ""}
+          current={savedByPlace.get(sheetPlaceId)}
+        />
       )}
     </div>
   );
