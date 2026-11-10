@@ -20,7 +20,7 @@ import { useSavedPlaces } from "@/features/saved";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { BottomSheet, Sheet } from "@/ui";
 
-import { inPriceRange, PAGE_SIZE, queryScore, type SortId, sortPlaces } from "../lib/listing";
+import { inPriceRange, PAGE_SIZE, queryScore, type SortId, sortPlaces, suggestPlaces } from "../lib/listing";
 import {
   CategoryChips,
   DetailHint,
@@ -86,16 +86,23 @@ export function ExploreScreen() {
   const categories = useMemo(() => countCategories(all), [all]);
   const hasRatings = all.some((p) => p.avg_rating !== null && p.review_count > 0);
   const folded = query.trim().toLowerCase();
+  // the filters other than the text (category, rating, price)
+  const passesOtherFilters = useCallback(
+    (p: MapPlace) =>
+      (!activeCategory || normalizeCategory(p.category) === activeCategory) &&
+      (!topRated || (p.avg_rating !== null && p.avg_rating >= TOP_RATED)) &&
+      inPriceRange(p, price),
+    [activeCategory, topRated, price],
+  );
   const visible = useMemo(
+    () => all.filter((p) => passesOtherFilters(p) && queryScore(p, folded) > 0),
+    [all, passesOtherFilters, folded],
+  );
+  // suggestions come from ALL places: one hidden by another filter is still found, and marked
+  const suggestions = useMemo(
     () =>
-      all.filter(
-        (p) =>
-          (!activeCategory || normalizeCategory(p.category) === activeCategory) &&
-          (!topRated || (p.avg_rating !== null && p.avg_rating >= TOP_RATED)) &&
-          inPriceRange(p, price) &&
-          queryScore(p, folded) > 0,
-      ),
-    [all, activeCategory, topRated, price, folded],
+      suggestPlaces(all, folded).map((p) => ({ place: p, icon: iconOf(p), outside: !passesOtherFilters(p) })),
+    [all, folded, passesOtherFilters],
   );
   // with a text filter and no explicit sort: name matches first, then address / category matches
   const sorted = useMemo(
@@ -137,6 +144,18 @@ export function ExploreScreen() {
     setDetailOpen(false);
   }, []);
   const setCategory = (name: string | null) => router.replace(categoryHref(name), { scroll: false });
+
+  /** A suggestion was picked: show that place. If another filter hides it, clear those filters first. */
+  const pickSuggestion = (id: string) => {
+    const place = all.find((p) => p.place_id === id);
+    if (!place) return;
+    if (!passesOtherFilters(place)) {
+      setPrice(0);
+      setTopRated(false);
+      if (activeCategory && normalizeCategory(place.category) !== activeCategory) setCategory(null);
+    }
+    select(id, "list");
+  };
   const clearFilters = () => {
     setQuery("");
     setPrice(0);
@@ -163,7 +182,15 @@ export function ExploreScreen() {
         <ExploreHero placeCount={places.data?.length ?? null} area={AREA} />
 
         <div className="flex flex-col gap-3">
-          <SearchFilters query={query} onQuery={setQuery} price={price} onPrice={setPrice} />
+          <SearchFilters
+            query={query}
+            onQuery={setQuery}
+            suggestions={suggestions}
+            matchCount={visible.length}
+            onPick={pickSuggestion}
+            price={price}
+            onPrice={setPrice}
+          />
           <CategoryChips
             categories={categories}
             total={all.length}

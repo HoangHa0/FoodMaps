@@ -53,6 +53,47 @@ export function queryScore(p: MapPlace, query: string): number {
   return 0;
 }
 
+/**
+ * Up to `limit` places for the suggestion list under the search field, best first: the whole name
+ * starts with the query, then names whose words start with it (shorter names first), then places
+ * that match only by address or category. Pure client-side, on the places already loaded.
+ */
+export function suggestPlaces(places: readonly MapPlace[], query: string, limit = 6): MapPlace[] {
+  const q = query.trim();
+  if (!q) return [];
+  const head = fold(q);
+  return places
+    .map((p) => ({ p, score: queryScore(p, q) * 10 + (fold(p.name).startsWith(head) ? 5 : 0) }))
+    .filter((x) => x.score >= 10)
+    .sort((a, b) => b.score - a.score || a.p.name.length - b.p.name.length || a.p.name.localeCompare(b.p.name, "vi"))
+    .slice(0, limit)
+    .map((x) => x.p);
+}
+
+/**
+ * Splits a name into plain and matched parts for highlighting: in each word, the beginning that a
+ * query word starts with ("pho" marks "Phở" in "Phở Bát Đàn"). Folding keeps one character per
+ * character, so positions in the folded text are positions in the original.
+ */
+export function highlightParts(name: string, query: string): { text: string; match: boolean }[] {
+  const raw = query.trim().toLowerCase();
+  if (!raw) return [{ text: name, match: false }];
+  const exact = fold(raw) !== raw.replace(/đ/g, "d");
+  const norm = (s: string) => (exact ? s.toLowerCase() : [...s].map((c) => fold(c) || c).join(""));
+  const tokens = words(norm(raw)).sort((a, b) => b.length - a.length);
+  const parts: { text: string; match: boolean }[] = [];
+  for (const piece of name.split(/([^\p{L}\p{N}]+)/u)) {
+    const t = tokens.find((tok) => piece && norm(piece).startsWith(tok));
+    if (t) {
+      parts.push({ text: piece.slice(0, t.length), match: true });
+      if (piece.length > t.length) parts.push({ text: piece.slice(t.length), match: false });
+    } else if (piece) {
+      parts.push({ text: piece, match: false });
+    }
+  }
+  return parts;
+}
+
 export function inPriceRange(p: MapPlace, index: number): boolean {
   const r = PRICE_RANGES[index] ?? PRICE_RANGES[0];
   if (r.min === null && r.max === null) return true;
