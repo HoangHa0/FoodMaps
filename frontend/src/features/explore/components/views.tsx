@@ -395,6 +395,7 @@ export function PlaceDetail({
   directionsUrl,
   mapsUrl,
   insights,
+  reviews,
 }: {
   place: MapPlace;
   icon: string;
@@ -406,6 +407,8 @@ export function PlaceDetail({
   mapsUrl: string;
   /** AI summary block (rendered by the container, from the match feature) */
   insights?: ReactNode;
+  /** Website reviews block (rendered by the container, from the reviews feature) */
+  reviews?: ReactNode;
 }) {
   return (
     <article className="flex flex-col gap-4" data-testid="place-detail" aria-labelledby="place-detail-name">
@@ -457,6 +460,7 @@ export function PlaceDetail({
         </a>
       </div>
       {insights}
+      {reviews}
     </article>
   );
 }
