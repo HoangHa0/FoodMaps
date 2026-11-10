@@ -387,6 +387,152 @@
         "title": "JoinedOut",
         "type": "object"
       },
+      "JourneyIn": {
+        "description": "A whole journey. The order of `stops` is the order shown; the server numbers it 1..n.",
+        "properties": {
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Date"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/StopIn"
+            },
+            "maxItems": 20,
+            "title": "Stops",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "JourneyIn",
+        "type": "object"
+      },
+      "JourneyOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Date"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/StopOut"
+            },
+            "title": "Stops",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "stops"
+        ],
+        "title": "JourneyOut",
+        "type": "object"
+      },
+      "JourneySummaryOut": {
+        "description": "One row of the library list.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Date"
+          },
+          "stop_count": {
+            "minimum": 0.0,
+            "title": "Stop Count",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "updated_at",
+          "stop_count"
+        ],
+        "title": "JourneySummaryOut",
+        "type": "object"
+      },
       "LoginIn": {
         "properties": {
           "password": {
@@ -734,6 +880,74 @@
           "votes_cast"
         ],
         "title": "ParticipantOut",
+        "type": "object"
+      },
+      "PlaceOut": {
+        "description": "The part of a place that a journey screen needs. Read from `places`, never stored here.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "google_maps_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Maps Url"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "title": "Lng",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          },
+          "price_per_person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "VND",
+            "title": "Price Per Person"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "title": "PlaceOut",
         "type": "object"
       },
       "PlaceSummaryOut": {
@@ -1774,6 +1988,163 @@
         "title": "SavedPlaceUpdateIn",
         "type": "object"
       },
+      "ShareCreatedOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "title": "ShareCreatedOut",
+        "type": "object"
+      },
+      "ShareIn": {
+        "description": "Same body, but a link to an empty journey is pointless, so at least one stop is required.",
+        "properties": {
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Date"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/StopIn"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Stops",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "stops"
+        ],
+        "title": "ShareIn",
+        "type": "object"
+      },
+      "SharedJourneyOut": {
+        "description": "What anyone holding the link sees. Nothing about the account that created it.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "missing_places": {
+            "default": 0,
+            "description": "stops dropped because the place no longer exists",
+            "minimum": 0.0,
+            "title": "Missing Places",
+            "type": "integer"
+          },
+          "planned_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Date"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/SharedStopOut"
+            },
+            "title": "Stops",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "expires_at",
+          "stops"
+        ],
+        "title": "SharedJourneyOut",
+        "type": "object"
+      },
+      "SharedStopOut": {
+        "description": "A stop of a share link. It has no `id`: the snapshot is not made of database rows.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "place": {
+            "$ref": "#/components/schemas/PlaceOut"
+          },
+          "planned_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Time"
+          },
+          "stop_order": {
+            "minimum": 1.0,
+            "title": "Stop Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stop_order",
+          "place"
+        ],
+        "title": "SharedStopOut",
+        "type": "object"
+      },
       "StartIn": {
         "properties": {
           "criteria": {
@@ -1784,6 +2155,93 @@
           "criteria"
         ],
         "title": "StartIn",
+        "type": "object"
+      },
+      "StopIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "place_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Place Id",
+            "type": "string"
+          },
+          "planned_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HH:MM, no time zone",
+            "title": "Planned Time"
+          }
+        },
+        "required": [
+          "place_id"
+        ],
+        "title": "StopIn",
+        "type": "object"
+      },
+      "StopOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "place": {
+            "$ref": "#/components/schemas/PlaceOut"
+          },
+          "planned_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Time"
+          },
+          "stop_order": {
+            "minimum": 1.0,
+            "title": "Stop Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "stop_order",
+          "place"
+        ],
+        "title": "StopOut",
         "type": "object"
       },
       "TermCount": {
@@ -2610,6 +3068,296 @@
         "summary": "Health",
         "tags": [
           "core"
+        ]
+      }
+    },
+    "/api/journeys": {
+      "get": {
+        "operationId": "my_journeys_api_journeys_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JourneySummaryOut"
+                  },
+                  "title": "Response My Journeys Api Journeys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "My Journeys",
+        "tags": [
+          "M6 journey"
+        ]
+      },
+      "post": {
+        "operationId": "create_journey_api_journeys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JourneyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Create Journey",
+        "tags": [
+          "M6 journey"
+        ]
+      }
+    },
+    "/api/journeys/shares": {
+      "post": {
+        "description": "Snapshot the journey as sent (saved or not) behind a code that works for 7 days.",
+        "operationId": "create_share_api_journeys_shares_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Create Share",
+        "tags": [
+          "M6 journey"
+        ]
+      }
+    },
+    "/api/journeys/shares/{code}": {
+      "get": {
+        "description": "Read-only view. A wrong code and an expired one both answer 404.",
+        "operationId": "read_share_api_journeys_shares__code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedJourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Share",
+        "tags": [
+          "M6 journey"
+        ]
+      }
+    },
+    "/api/journeys/{journey_id}": {
+      "delete": {
+        "operationId": "delete_journey_api_journeys__journey_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journey_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Journey Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Journey",
+        "tags": [
+          "M6 journey"
+        ]
+      },
+      "get": {
+        "operationId": "get_journey_api_journeys__journey_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journey_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Journey Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Journey",
+        "tags": [
+          "M6 journey"
+        ]
+      },
+      "put": {
+        "description": "Overwrite the whole journey: title, date and the stops exactly as sent.",
+        "operationId": "replace_journey_api_journeys__journey_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "journey_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Journey Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JourneyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Replace Journey",
+        "tags": [
+          "M6 journey"
         ]
       }
     },

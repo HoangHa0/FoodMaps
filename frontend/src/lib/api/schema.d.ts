@@ -284,6 +284,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Journeys */
+        get: operations["my_journeys_api_journeys_get"];
+        put?: never;
+        /** Create Journey */
+        post: operations["create_journey_api_journeys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Share
+         * @description Snapshot the journey as sent (saved or not) behind a code that works for 7 days.
+         */
+        post: operations["create_share_api_journeys_shares_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/shares/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Share
+         * @description Read-only view. A wrong code and an expired one both answer 404.
+         */
+        get: operations["read_share_api_journeys_shares__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/{journey_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Journey */
+        get: operations["get_journey_api_journeys__journey_id__get"];
+        /**
+         * Replace Journey
+         * @description Overwrite the whole journey: title, date and the stops exactly as sent.
+         */
+        put: operations["replace_journey_api_journeys__journey_id__put"];
+        post?: never;
+        /** Delete Journey */
+        delete: operations["delete_journey_api_journeys__journey_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/match": {
         parameters: {
             query?: never;
@@ -816,6 +896,64 @@ export interface components {
             /** Participant Token */
             participant_token: string;
         };
+        /**
+         * JourneyIn
+         * @description A whole journey. The order of `stops` is the order shown; the server numbers it 1..n.
+         */
+        JourneyIn: {
+            /** Planned Date */
+            planned_date?: string | null;
+            /** Stops */
+            stops?: components["schemas"]["StopIn"][];
+            /** Title */
+            title?: string | null;
+        };
+        /** JourneyOut */
+        JourneyOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Planned Date */
+            planned_date?: string | null;
+            /** Stops */
+            stops: components["schemas"]["StopOut"][];
+            /** Title */
+            title?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * JourneySummaryOut
+         * @description One row of the library list.
+         */
+        JourneySummaryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Planned Date */
+            planned_date?: string | null;
+            /** Stop Count */
+            stop_count: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** LoginIn */
         LoginIn: {
             /** Password */
@@ -973,6 +1111,31 @@ export interface components {
             is_host: boolean;
             /** Votes Cast */
             votes_cast: number;
+        };
+        /**
+         * PlaceOut
+         * @description The part of a place that a journey screen needs. Read from `places`, never stored here.
+         */
+        PlaceOut: {
+            /** Address */
+            address?: string | null;
+            /** Category */
+            category: string;
+            /** Google Maps Url */
+            google_maps_url?: string | null;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Price Per Person
+             * @description VND
+             */
+            price_per_person?: number | null;
         };
         /**
          * PlaceSummaryOut
@@ -1419,9 +1582,94 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** ShareCreatedOut */
+        ShareCreatedOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * ShareIn
+         * @description Same body, but a link to an empty journey is pointless, so at least one stop is required.
+         */
+        ShareIn: {
+            /** Planned Date */
+            planned_date?: string | null;
+            /** Stops */
+            stops: components["schemas"]["StopIn"][];
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * SharedJourneyOut
+         * @description What anyone holding the link sees. Nothing about the account that created it.
+         */
+        SharedJourneyOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Missing Places
+             * @description stops dropped because the place no longer exists
+             * @default 0
+             */
+            missing_places: number;
+            /** Planned Date */
+            planned_date?: string | null;
+            /** Stops */
+            stops: components["schemas"]["SharedStopOut"][];
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * SharedStopOut
+         * @description A stop of a share link. It has no `id`: the snapshot is not made of database rows.
+         */
+        SharedStopOut: {
+            /** Note */
+            note?: string | null;
+            place: components["schemas"]["PlaceOut"];
+            /** Planned Time */
+            planned_time?: string | null;
+            /** Stop Order */
+            stop_order: number;
+        };
         /** StartIn */
         StartIn: {
             criteria: components["schemas"]["MatchCriteria"];
+        };
+        /** StopIn */
+        StopIn: {
+            /** Note */
+            note?: string | null;
+            /** Place Id */
+            place_id: string;
+            /**
+             * Planned Time
+             * @description HH:MM, no time zone
+             */
+            planned_time?: string | null;
+        };
+        /** StopOut */
+        StopOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note?: string | null;
+            place: components["schemas"]["PlaceOut"];
+            /** Planned Time */
+            planned_time?: string | null;
+            /** Stop Order */
+            stop_order: number;
         };
         /** TermCount */
         TermCount: {
@@ -2059,6 +2307,289 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    my_journeys_api_journeys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneySummaryOut"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_journey_api_journeys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JourneyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_share_api_journeys_shares_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareCreatedOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_share_api_journeys_shares__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedJourneyOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_journey_api_journeys__journey_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_journey_api_journeys__journey_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JourneyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_journey_api_journeys__journey_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
