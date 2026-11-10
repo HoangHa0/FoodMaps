@@ -18,7 +18,6 @@ import {
   IconDirections,
   IconHeart,
   IconPin,
-  IconSearch,
   IconSort,
   IconStar,
   IconWrite,
@@ -31,6 +30,7 @@ import {
 import type { MapPlace } from "@/features/map";
 
 import { PRICE_RANGES, SORTS, type SortId } from "../lib/listing";
+import { PlaceSearchBox, type PlaceSuggestion } from "./PlaceSearchBox";
 
 const vnd = new Intl.NumberFormat("vi-VN");
 
@@ -75,32 +75,37 @@ export interface CategoryChip {
 const control =
   "h-10 rounded-control border border-border bg-surface px-3.5 text-sm text-fg shadow-card outline-none transition ease-standard focus:ring-2 focus:ring-primary";
 
-/** Text filter + price range: they narrow both the pins and the list. */
+/**
+ * Place-name search with suggestions + price range. The text narrows both the pins and the list;
+ * picking a suggestion opens that place.
+ */
 export function SearchFilters({
   query,
   onQuery,
+  suggestions,
+  matchCount,
+  onPick,
   price,
   onPrice,
 }: {
   query: string;
   onQuery: (q: string) => void;
+  suggestions: PlaceSuggestion[];
+  matchCount: number;
+  onPick: (placeId: string) => void;
   price: number;
   onPrice: (i: number) => void;
 }) {
   return (
-    <div className="flex gap-2" role="search" aria-label="Lọc quán">
-      <label className="relative min-w-0 flex-1">
-        <span className="sr-only">Lọc theo tên quán hoặc địa chỉ</span>
-        <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Lọc theo tên quán, địa chỉ…"
-          className={cn(control, "w-full pl-10")}
-          data-testid="place-filter"
-        />
-      </label>
+    <div className="flex gap-2" role="search" aria-label="Tìm và lọc quán">
+      <PlaceSearchBox
+        query={query}
+        onQuery={onQuery}
+        suggestions={suggestions}
+        matchCount={matchCount}
+        onPick={onPick}
+        className="flex-1"
+      />
       <label className="flex shrink-0 items-center gap-2">
         <span className="sr-only text-sm font-semibold text-fg-muted sm:not-sr-only">Giá</span>
         <select
