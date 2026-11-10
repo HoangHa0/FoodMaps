@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -25,10 +25,31 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+# Seconds to wait for a NEW database connection. asyncpg's default (60 s) outlasts the Next.js proxy, so
+# a stuck connect looked like a page that never loads; failing fast lets the client retry instead.
+CONNECT_TIMEOUT_S = 10
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def connect_args_for(database_url: str, use_pgbouncer: bool) -> dict:
+    """asyncpg options. The local Docker database has no TLS: skipping the TLS probe removes a step
+    that Docker Desktop on Windows sometimes resets under load ("WinError 10054"). Remote databases
+    (Supabase) keep asyncpg's default TLS negotiation."""
+    args: dict = {"timeout": CONNECT_TIMEOUT_S}
+    if use_pgbouncer:
+        args["statement_cache_size"] = 0
+    if make_url(database_url).host in LOCAL_HOSTS:
+        args["ssl"] = False
+    return args
+
+
 def _make_engine():
     s = get_settings()
-    connect_args = {"statement_cache_size": 0} if s.db_use_pgbouncer else {}
-    return create_async_engine(s.database_url, pool_pre_ping=True, connect_args=connect_args)
+    return create_async_engine(
+        s.database_url,
+        pool_pre_ping=True,
+        connect_args=connect_args_for(s.database_url, s.db_use_pgbouncer),
+    )
 
 
 engine = _make_engine()

@@ -6,6 +6,7 @@ export type Joined = Schemas["JoinedOut"];
 export type Candidate = Schemas["CandidateOut"];
 export type Participant = Schemas["ParticipantOut"];
 export type Criteria = Schemas["MatchCriteria"];
+export type RoomPreview = Schemas["RoomPreviewOut"];
 
 /** Room-member authentication header, sent on EVERY request after joining. */
 export const participantHeaders = (token: string) => ({ "X-Participant-Token": token });
@@ -14,6 +15,10 @@ export const participantHeaders = (token: string) => ({ "X-Participant-Token": t
 export const groupApi = {
   createRoom: async (displayName: string) =>
     unwrap(await api.POST("/api/groups", { body: { display_name: displayName } })),
+
+  /** Public facts before joining (no token): 404 if the room does not exist. */
+  preview: async (code: string) =>
+    unwrap(await api.GET("/api/groups/{code}/preview", { params: { path: { code } } })),
 
   joinRoom: async (code: string, displayName: string) =>
     unwrap(

@@ -48,9 +48,19 @@ BUDGET_UNKNOWN_SCORE = 0.5  # the place has no price but the user gave a budget
 
 # --- "Not Match" rerank -----------------------------------------------------------------------
 # new key = (1 - REJECT_PREFERENCE_WEIGHT) * original score + REJECT_PREFERENCE_WEIGHT * preference.
-# 0 would ignore the complaint, 1 would ignore the original score. 0.6 lets the complaint win when
-# two places are close, but a clearly better match is not thrown away for a tiny gain.
-REJECT_PREFERENCE_WEIGHT = 0.6
+# 0 would ignore the complaint, 1 would ignore the original score. The places that cannot answer
+# the complaint are already removed (too expensive / too far) or demoted (too crowded), so the
+# complaint is only a nudge here: the match to what the user asked for stays the main criterion.
+REJECT_PREFERENCE_WEIGHT = 0.25
+# Without this floor the cheapest / closest / quietest backup wins even when it has nothing to do
+# with the request (a coworking space offered after a Korean restaurant was "too expensive"). A
+# backup whose match is below this share of the rejected place's match is not offered again.
+REJECT_MIN_RELATIVE_SCORE = 0.75
+# For "too expensive / far / crowded" the replacement should also be LIKE the rejected place (same
+# kind of food and mood), not just cheaper / closer / quieter: this is the share of the preference
+# that comes from "like the rejected place" (cosine between the two embeddings, scaled in the backups).
+REJECT_LIKENESS_SHARE = 0.6
+MIN_SIMILARITY_SPREAD = 1e-3  # below this the backups are equally like the rejected place
 NEUTRAL_PREFERENCE = 0.5  # the data needed to judge the complaint is missing: neither good nor bad
 
 REASON_TOO_FAR = "too_far"
@@ -151,6 +161,7 @@ class Scored:
     n_reviews: int = 0
     avg_rating: float | None = None  # raw mean of the review scores (1..5), NOT the shrunk one
     crowd: float | None = None  # 0 (quiet) .. 1 (packed); None = nobody said
+    vibe_to_rejected: float | None = None  # cosine to the rejected place; only for "wrong_vibe"
 
 
 def score_candidates(
@@ -278,11 +289,58 @@ def _cheapness(candidates: Sequence[Scored]) -> dict[str, float]:
     return out
 
 
+def _unlikeness(candidates: Sequence[Scored]) -> dict[str, float]:
+    """0 for the backup most like the rejected place, 1 for the one least like it (within the backups).
+
+    Relative on purpose: the cosines between two places sit in a narrow band that depends on the
+    model (about 0.8-0.95 for e5), so a fixed scale would put every place at the same end.
+    Without at least two known similarities there is nothing to compare, so nobody gets a value.
+    """
+    sims = {c.place_id: c.vibe_to_rejected for c in candidates if c.vibe_to_rejected is not None}
+    if len(sims) < 2:
+        return {}
+    low, high = min(sims.values()), max(sims.values())
+    if high - low < MIN_SIMILARITY_SPREAD:  # equal up to rounding: scaling would only amplify noise
+        return {}
+    return {pid: (high - sim) / (high - low) for pid, sim in sims.items()}
+
+
+def _same_kind(c: Scored, rejected: Scored) -> bool:
+    """A restaurant is not replaced by a coffee shop just because the user found it too dear / far / busy.
+
+    An unknown category on either side proves nothing, so it is kept.
+    """
+    if not c.category or not rejected.category:
+        return True
+    return c.category.strip().lower() == rejected.category.strip().lower()
+
+
+def _no_better_than(c: Scored, reason: str, rejected: Scored | None) -> bool:
+    """True when `c` is not better than the rejected place on what the user complained about.
+
+    A place that costs as much or more than the one rejected as "too expensive" (or is as far, or
+    as crowded) cannot be what the user wants. Missing data on either side proves nothing, so a
+    place with an unknown price, distance or crowd is never "no better".
+    """
+    if rejected is None:
+        return False
+    if reason == REASON_TOO_EXPENSIVE:
+        mine, theirs = c.price_per_person, rejected.price_per_person
+    elif reason == REASON_TOO_FAR:
+        mine, theirs = c.distance_m, rejected.distance_m
+    elif reason == REASON_TOO_CROWDED:
+        mine, theirs = c.crowd, rejected.crowd
+    else:
+        return False
+    return mine is not None and theirs is not None and mine >= theirs
+
+
 def rerank_after_reject(
     candidates: Sequence[Scored],
     reason: str,
     *,
     rejected_place_id: str | None = None,
+    rejected: Scored | None = None,
 ) -> list[Scored]:
     """Reorder the remaining backups after the user pressed "Not Match" (pure, deterministic).
 
@@ -292,30 +350,75 @@ def rerank_after_reject(
         too_far        prefer the closer place        (distance component; neutral without origin)
         too_expensive  prefer the cheaper place       (relative to the other backups)
         too_crowded    prefer the quieter place       (from the reviews' crowd answers)
-        wrong_vibe     prefer the better mood match   (semantic component)
+        wrong_vibe     prefer the better mood match   (semantic component) that is also unlike the
+                       rejected place (cosine between the two embeddings, when it is known)
+
+    The rejected place itself (`rejected`, or the entry of `candidates` with `rejected_place_id`)
+    is the yardstick, and it is used in two ways:
+
+    - too_expensive / too_far: a place that is not cheaper / not closer is REMOVED. Both are exact
+      numbers the user just said no to, so showing such a place again would contradict the click.
+      If nothing is left the answer is empty and the UI offers a new search.
+    - too_crowded: a place that is not quieter is placed after all the quieter ones. The crowd comes
+      from free-text answers that many places do not have, so it is not strong enough to remove.
+
+    - all but wrong_vibe: among the places that pass, the ones most LIKE the rejected place come first
+      (`REJECT_LIKENESS_SHARE`), so a cheaper place is also a similar one (Busan Yori, not Lotteria,
+      after a Korean sit-down restaurant). Without the similarities only the complaint counts.
+    - all but wrong_vibe: a backup that matches the request much worse than the rejected place
+      (`REJECT_MIN_RELATIVE_SCORE`), or that is another kind of place (restaurant vs coffee shop), is
+      removed, so "cheaper" never means "cheaper but off-topic".
 
     An unknown reason keeps the original order. Ties are broken by `place_id`.
     """
+    if rejected is None and rejected_place_id is not None:
+        rejected = next((c for c in candidates if c.place_id == rejected_place_id), None)
     pool = [c for c in candidates if c.place_id != rejected_place_id]
+    # Cheapness is measured BEFORE the dearer places are removed, so a place that is surely cheaper
+    # than the rejected one still beats a place with an unknown price.
     cheap = _cheapness(pool) if reason == REASON_TOO_EXPENSIVE else {}
+    unlike = _unlikeness(pool)  # empty unless the similarities to the rejected place are attached
+    if reason in (REASON_TOO_EXPENSIVE, REASON_TOO_FAR):
+        pool = [c for c in pool if not _no_better_than(c, reason, rejected)]
+    if rejected is not None and reason != REASON_WRONG_VIBE:
+        floor = REJECT_MIN_RELATIVE_SCORE * rejected.score
+        pool = [c for c in pool if c.score >= floor and _same_kind(c, rejected)]
 
     def preference(c: Scored) -> float:
+        if reason == REASON_WRONG_VIBE:
+            parts = [v for v in (c.components.get("semantic"), unlike.get(c.place_id)) if v is not None]
+            value = sum(parts) / len(parts) if parts else None
+            return NEUTRAL_PREFERENCE if value is None else clamp01(value)
         if reason == REASON_TOO_FAR:
             value = c.components.get("distance")
         elif reason == REASON_TOO_EXPENSIVE:
             value = cheap[c.place_id]
         elif reason == REASON_TOO_CROWDED:
             value = None if c.crowd is None else 1.0 - c.crowd
-        elif reason == REASON_WRONG_VIBE:
-            value = c.components.get("semantic")
         else:
             return NEUTRAL_PREFERENCE
-        return NEUTRAL_PREFERENCE if value is None else clamp01(value)
+        value = NEUTRAL_PREFERENCE if value is None else clamp01(value)
+        if c.place_id not in unlike:  # nothing to compare with the rejected place
+            return value
+        share = REJECT_LIKENESS_SHARE
+        return (1 - share) * value + share * (1.0 - unlike[c.place_id])
 
     w = REJECT_PREFERENCE_WEIGHT
-    return sorted(pool, key=lambda c: (-((1 - w) * c.score + w * preference(c)), c.place_id))
+    return sorted(
+        pool,
+        key=lambda c: (
+            _no_better_than(c, reason, rejected),
+            -((1 - w) * c.score + w * preference(c)),
+            c.place_id,
+        ),
+    )
 
 
 def with_crowd(candidates: Sequence[Scored], crowd_by_place: dict[str, float | None]) -> list[Scored]:
     """Attach the crowd number to already-scored places (it is only needed for the reject rerank)."""
     return [replace(c, crowd=crowd_by_place.get(c.place_id)) for c in candidates]
+
+
+def with_vibe_similarity(candidates: Sequence[Scored], sim_by_place: dict[str, float]) -> list[Scored]:
+    """Attach the cosine to the rejected place (only needed for the "wrong_vibe" rerank)."""
+    return [replace(c, vibe_to_rejected=sim_by_place.get(c.place_id)) for c in candidates]

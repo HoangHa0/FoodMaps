@@ -84,6 +84,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/geo/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve
+         * @description Coordinates of the suggestion the user picked (404 `not_found` when the id is unknown).
+         */
+        get: operations["resolve_api_geo_resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/geo/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest
+         * @description Up to 10 suggestions for the text typed so far; `[]` below 2 characters (no VietMap call is made).
+         *
+         *     503 `geo_not_configured` when the server has no VietMap key, `geo_unavailable` when VietMap fails.
+         */
+        get: operations["suggest_api_geo_suggest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/groups": {
         parameters: {
             query?: never;
@@ -158,6 +200,27 @@ export interface paths {
          * @description Join the lobby. 409 if the room already started, is full or the name is taken; 410 if expired.
          */
         post: operations["join_room_api_groups__code__join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{code}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview
+         * @description Public, no token: status, host name and member count, so the join page can explain a room
+         *     that cannot be joined (expired, started, full) before asking for a name. 404 if unknown.
+         */
+        get: operations["preview_api_groups__code__preview_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -659,6 +722,28 @@ export interface components {
             lat: number;
             /** Lng */
             lng: number;
+        };
+        /**
+         * GeoSuggestionOut
+         * @description One line of the suggestion list shown under the address field.
+         */
+        GeoSuggestionOut: {
+            /**
+             * Address
+             * @description ward / district / city, shown under the name; may be empty
+             * @default
+             */
+            address: string;
+            /**
+             * Name
+             * @description short title: a place name, or house number + street
+             */
+            name: string;
+            /**
+             * Ref Id
+             * @description opaque id: pass it unchanged to `GET /api/geo/resolve`; do not store it
+             */
+            ref_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1170,6 +1255,31 @@ export interface components {
              */
             suitable_for?: string[];
         };
+        /**
+         * RoomPreviewOut
+         * @description Public facts about a room, shown BEFORE joining (no token): lets the join page say "not
+         *     found / expired / already started / full" instead of asking for a name first.
+         */
+        RoomPreviewOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Host Name */
+            host_name: string;
+            /** Joinable */
+            joinable: boolean;
+            /** Participant Count */
+            participant_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "lobby" | "voting" | "decided" | "expired";
+        };
         /** RoomStateOut */
         RoomStateOut: {
             /**
@@ -1524,6 +1634,90 @@ export interface operations {
             };
         };
     };
+    resolve_api_geo_resolve_get: {
+        parameters: {
+            query: {
+                ref_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoPoint"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    suggest_api_geo_suggest_get: {
+        parameters: {
+            query: {
+                /** @description what the user has typed */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoSuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     create_room_api_groups_post: {
         parameters: {
             query?: never;
@@ -1693,6 +1887,44 @@ export interface operations {
             };
             /** @description Gone */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_groups__code__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomPreviewOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -6,9 +6,10 @@
  */
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-import { type PositionState, useCurrentPosition } from "@/lib/geolocation";
+import { type Origin, OriginPicker } from "@/features/places";
 import {
   Badge,
+  BottomSheet,
   Button,
   Card,
   Chip,
@@ -18,11 +19,10 @@ import {
   IconDirections,
   IconFilters,
   IconHeart,
-  IconLocate,
   IconNotMatch,
-  IconSearch,
   IconSparkles,
   IconWrite,
+  IconPin,
   SearchInput,
   Spinner,
 } from "@/ui";
@@ -33,30 +33,28 @@ import {
   BUDGETS,
   budgetIndex,
   DEFAULT_RADIUS,
+  EMPTY_MESSAGE,
+  EMPTY_MESSAGE_AFTER,
   MOOD_CHIPS,
   RADII,
-  radiusLabel,
   REJECT_REASONS,
 } from "../lib/options";
 
 // --------------------------------------------------------------------------- collapsed search bar
 
-/** Collapsed bar in the top bar (desktop) or a search button (phone). Both open the overlay. */
+/** Search bar of the desktop top bar. Phones and tablets use the round button of the tab bar. */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
-    <>
-      <SearchInput
-        label="Tìm quán bằng AI"
-        placeholder="Hôm nay bạn muốn ăn gì? Mô tả để AI tìm quán…"
-        readOnly
-        onFocus={onOpen}
-        onClick={onOpen}
-        onSearch={onOpen}
-        className="hidden w-full max-w-154 cursor-pointer md:flex"
-        data-testid="match-trigger"
-      />
-      <IconButton label="Tìm quán bằng AI" icon={<IconSearch className="size-4.5" />} onClick={onOpen} className="md:hidden" />
-    </>
+    <SearchInput
+      label="Tìm quán bằng AI"
+      placeholder="Hôm nay bạn muốn ăn gì? Mô tả để AI tìm quán…"
+      readOnly
+      onFocus={onOpen}
+      onClick={onOpen}
+      onSearch={onOpen}
+      className="hidden w-full max-w-154 cursor-pointer lg:flex"
+      data-testid="match-trigger"
+    />
   );
 }
 
@@ -65,13 +63,16 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
 /** Full-screen search: mood sentence, quick chips, options (area, budget), big CTA. */
 export function MatchOverlay({
   initial,
+  initialOrigin,
   onSubmit,
   onClose,
   loading,
   error,
 }: {
   initial?: MatchCriteria;
-  onSubmit: (c: MatchCriteria) => void;
+  /** The starting point of the previous search, so reopening the overlay keeps it. */
+  initialOrigin?: Origin | null;
+  onSubmit: (c: MatchCriteria, origin: Origin | null) => void;
   onClose: () => void;
   loading?: boolean;
   error?: string;
@@ -79,9 +80,9 @@ export function MatchOverlay({
   const [mood, setMood] = useState(initial?.mood ?? "");
   const [budget, setBudget] = useState(budgetIndex(initial?.price_min, initial?.price_max));
   const [radius, setRadius] = useState(initial?.radius_m ?? DEFAULT_RADIUS);
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const { position, request, clear } = useCurrentPosition();
-  const origin = position.status === "ok" ? position.point : null;
+  const [origin, setOrigin] = useState<Origin | null>(initialOrigin ?? null);
+  // open from the start when an area is already chosen, so the active filter is visible
+  const [optionsOpen, setOptionsOpen] = useState(!!initialOrigin);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -95,7 +96,10 @@ export function MatchOverlay({
     e?.preventDefault();
     if (!mood.trim() || loading) return;
     const b = BUDGETS[budget];
-    onSubmit({ mood: mood.trim(), origin, radius_m: radius, price_min: b.min, price_max: b.max, categories: [] });
+    onSubmit(
+      { mood: mood.trim(), origin: origin?.point ?? null, radius_m: radius, price_min: b.min, price_max: b.max, categories: [] },
+      origin,
+    );
   }
 
   // Enter searches, Shift+Enter adds a new line
@@ -150,12 +154,12 @@ export function MatchOverlay({
           </Button>
           {optionsOpen && (
             <div className="mt-3 flex flex-col gap-4">
-              <AreaOptions
-                position={position}
-                hasOrigin={!!origin}
-                onToggle={() => (origin ? clear() : request())}
+              <OriginPicker
+                value={origin}
+                onChange={setOrigin}
                 radius={radius}
-                onRadius={setRadius}
+                onRadiusChange={setRadius}
+                radii={RADII}
               />
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-semibold">Khoảng giá mỗi người</legend>
@@ -180,74 +184,44 @@ export function MatchOverlay({
   );
 }
 
-function AreaOptions({
-  position,
-  hasOrigin,
-  onToggle,
-  radius,
-  onRadius,
-}: {
-  position: PositionState;
-  hasOrigin: boolean;
-  onToggle: () => void;
-  radius: number;
-  onRadius: (m: number) => void;
-}) {
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-semibold">Điểm xuất phát & bán kính</legend>
-      <div className="flex flex-wrap gap-2">
-        <Chip
-          selected={hasOrigin}
-          icon={<IconLocate className="size-4" aria-hidden />}
-          onClick={onToggle}
-          disabled={position.status === "loading"}
-        >
-          {position.status === "loading" ? "Đang lấy vị trí…" : "Vị trí của tôi"}
-        </Chip>
-        {hasOrigin &&
-          RADII.map((r) => (
-            <Chip key={r} selected={radius === r} onClick={() => onRadius(r)}>
-              {radiusLabel(r)}
-            </Chip>
-          ))}
-      </div>
-      {position.status === "error" ? (
-        <p className="text-sm text-warning">{position.message}</p>
-      ) : (
-        !hasOrigin && <p className="text-sm text-fg-muted">Không chọn: tìm ở mọi khu vực.</p>
-      )}
-    </fieldset>
-  );
-}
-
 // --------------------------------------------------------------------------- result sheet
 
-/** Bottom sheet over the map: one place + why + actions (spec 1.3). */
+/** Draggable bottom sheet over the map: one place + why + actions (spec 1.3). */
 export function MatchResultSheet({
   result,
   backupsLeft,
+  emptyAfter,
   why,
   whyLoading,
   directionsUrl,
+  originLabel,
   onClose,
   onSearchAgain,
   onReject,
   rejecting,
   rejectError,
   onWriteReview,
+  onShowOnMap,
+  saved,
+  onToggleSave,
 }: {
   result: MatchResult | null;
   backupsLeft: number;
+  emptyAfter?: RejectReason;
   why: WhyOut | undefined;
   whyLoading: boolean;
   directionsUrl: string;
+  /** Name of the chosen starting point when it is not the user's own position ("Cầu Giấy"). */
+  originLabel?: string;
   onClose: () => void;
   onSearchAgain: () => void;
   onReject: (reason: RejectReason) => void;
   rejecting: boolean;
   rejectError?: string;
   onWriteReview: () => void;
+  onShowOnMap: () => void;
+  saved: boolean;
+  onToggleSave: () => void;
 }) {
   const [askReason, setAskReason] = useState(false);
   // a new place arrived (after "Không hợp"): hide the reasons again
@@ -258,20 +232,21 @@ export function MatchResultSheet({
   }
 
   return (
-    <section
-      className="fixed inset-x-0 bottom-16 z-40 mx-auto max-h-[70vh] w-full max-w-xl overflow-y-auto rounded-t-sheet bg-surface-raised p-4 shadow-sheet lg:bottom-0"
-      aria-label="Kết quả AI Match"
+    <BottomSheet
+      label="Kết quả tìm quán"
+      resetKey={result?.place_id ?? "empty"}
+      peekHeight={112}
+      className="sm:max-w-xl"
       data-testid="match-result"
     >
-      <div className="mx-auto mb-3 h-1 w-10 rounded-control bg-border" aria-hidden />
       {result === null ? (
         <div className="flex flex-col gap-3 text-center">
           <div className="flex justify-end">
             <IconButton label="Đóng" variant="plain" icon={<IconClose className="size-5" />} onClick={onClose} />
           </div>
           <h2 className="font-display text-xl font-semibold">Chưa tìm được quán hợp</h2>
-          <p className="text-fg-muted">
-            Không còn quán nào khớp tiêu chí. Thử mô tả khác hoặc nới bán kính, khoảng giá nhé.
+          <p className="text-fg-muted" data-testid="match-empty">
+            {(emptyAfter && EMPTY_MESSAGE_AFTER[emptyAfter]) ?? EMPTY_MESSAGE}
           </p>
           <Button onClick={onSearchAgain}>Tìm lại</Button>
         </div>
@@ -282,17 +257,24 @@ export function MatchResultSheet({
               <h2 className="font-display text-xl font-bold" data-testid="match-name">
                 {result.name ?? "Quán phù hợp nhất"}
               </h2>
-              {/* Price and distance remain in the Why box; the public rating is shown above. */}
-              {result.distance_m != null && (
-                <p className="mt-1 text-sm text-fg-muted">Cách khoảng {formatDistance(result.distance_m)}</p>
-              )}
-              <p className="mt-1 text-sm text-fg-muted">
-                {result.avg_rating != null && result.review_count > 0
-                  ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
-                  : "Chưa có đánh giá"}
+              {/* One line of facts under the name: distance (only with an origin) · public rating.
+                  The Why box keeps the price; it does not repeat the distance or the rating. */}
+              <p className="mt-1 text-sm text-fg-muted" data-testid="match-meta">
+                {[
+                  result.distance_m != null
+                    ? originLabel
+                      ? `📍 ${formatDistance(result.distance_m)} từ ${originLabel}`
+                      : `📍 Cách ${formatDistance(result.distance_m)}`
+                    : null,
+                  result.avg_rating != null && result.review_count > 0
+                    ? `★ ${result.avg_rating.toFixed(1)} (${result.review_count} đánh giá)`
+                    : "Chưa có đánh giá",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
-            <Badge tone="accent">{Math.round(result.match_score * 100)}% MATCH</Badge>
+            <Badge tone="accent">Hợp {Math.round(result.match_score * 100)}%</Badge>
             <IconButton label="Đóng" variant="plain" icon={<IconClose className="size-5" />} onClick={onClose} />
           </div>
 
@@ -307,7 +289,7 @@ export function MatchResultSheet({
           <WhyBox
             why={why}
             loading={whyLoading}
-            reasons={(result.reasons ?? []).filter((reason) => !reason.startsWith("⭐ "))}
+            reasons={(result.reasons ?? []).filter((reason) => !reason.startsWith("⭐ ") && !reason.startsWith("📍 "))}
           />
 
           <div className="grid grid-cols-3 gap-2">
@@ -315,18 +297,18 @@ export function MatchResultSheet({
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-sm font-bold text-primary-fg shadow-card"
+              className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-control bg-primary px-2 text-sm font-bold text-primary-fg shadow-card"
             >
               <IconDirections className="size-4" aria-hidden /> Chỉ đường
             </a>
-            {/* M2 has no saved-places API yet: the button is shown but disabled until it exists */}
-            <Button variant="secondary" disabled title="Sắp có: cần API lưu quán (M2)">
-              <IconHeart className="size-4" aria-hidden /> Lưu
+            <Button variant="secondary" onClick={onToggleSave} aria-pressed={saved} className="whitespace-nowrap px-2 text-sm">
+              <IconHeart className={cn("size-4", saved && "fill-accent text-accent")} aria-hidden /> {saved ? "Đã lưu" : "Lưu"}
             </Button>
             <Button
               variant="secondary"
               onClick={() => setAskReason((a) => !a)}
               aria-expanded={askReason}
+              className="whitespace-nowrap px-2 text-sm"
               data-testid="match-reject"
             >
               <IconNotMatch className="size-4" aria-hidden /> Không hợp
@@ -348,38 +330,45 @@ export function MatchResultSheet({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2 text-sm text-fg-muted">
-            <span>{backupsLeft > 0 ? `Còn ${backupsLeft} quán dự phòng` : "Không còn quán dự phòng"}</span>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm" onClick={onWriteReview}>
-                <IconWrite className="size-4" aria-hidden /> Viết review
+          <p className="-mt-2 text-xs text-fg-muted">
+            {backupsLeft > 0
+              ? `Còn ${backupsLeft} quán dự phòng: bấm “Không hợp” để xem quán tiếp theo.`
+              : "Đây là quán cuối cùng khớp tiêu chí."}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-1 border-t border-border pt-3">
+            <div className="flex flex-wrap gap-1">
+              <Button variant="ghost" size="sm" onClick={onShowOnMap}>
+                <IconPin className="size-4" aria-hidden /> Xem trên bản đồ
               </Button>
-              <Button variant="ghost" size="sm" onClick={onSearchAgain}>
-                Tìm lại
+              <Button variant="ghost" size="sm" onClick={onWriteReview}>
+                <IconWrite className="size-4" aria-hidden /> Viết đánh giá
               </Button>
             </div>
+            <Button variant="ghost" size="sm" onClick={onSearchAgain}>
+              <IconSparkles className="size-4" aria-hidden /> Tìm lại
+            </Button>
           </div>
         </div>
       )}
-    </section>
+    </BottomSheet>
   );
 }
 
-/** "✨ Why this place?": bullets from the reviews (M3) + the score reasons (distance, price, rating). */
+/** "✨ Vì sao hợp với bạn?": bullets from the reviews (M3) + the score reasons (distance, price, rating). */
 function WhyBox({ why, loading, reasons }: { why: WhyOut | undefined; loading: boolean; reasons: string[] }) {
   const points = why?.points ?? [];
   if (!loading && points.length === 0 && reasons.length === 0) return null;
   return (
     <Card className="flex flex-col gap-2 bg-primary-soft" data-testid="match-why">
       <h3 className="flex items-center gap-2 font-semibold">
-        <IconSparkles className="size-4" aria-hidden /> Why this place?
+        <IconSparkles className="size-4" aria-hidden /> Vì sao hợp với bạn?
       </h3>
       {loading && <Spinner size="sm" />}
       <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
         {points.map((p) => (
           <li key={p.text} className={cn(p.matched && "font-semibold")}>
             {p.text}
-            {p.matched && <span className="ml-1.5 text-xs font-normal text-fg-muted">· khớp với bạn</span>}
           </li>
         ))}
         {reasons.map((r) => (

@@ -15,6 +15,7 @@ from app.modules.groups.schemas import (
     CreateRoomIn,
     JoinedOut,
     JoinRoomIn,
+    RoomPreviewOut,
     RoomStateOut,
     StartIn,
     VoteIn,
@@ -41,6 +42,13 @@ async def join_room(code: str, data: JoinRoomIn, user: OptionalUser, db: Db):
     """Join the lobby. 409 if the room already started, is full or the name is taken; 410 if expired."""
     room, me, token = await service.join_room(db, code, data, user)
     return JoinedOut(code=room.code, participant_id=me.id, participant_token=token, is_host=False)
+
+
+@router.get("/{code}/preview", response_model=RoomPreviewOut, responses={404: {}})
+async def preview(code: str, db: Db):
+    """Public, no token: status, host name and member count, so the join page can explain a room
+    that cannot be joined (expired, started, full) before asking for a name. 404 if unknown."""
+    return await service.preview_room(db, code)
 
 
 @router.get("/{code}", response_model=RoomStateOut, responses={401: {}, 404: {}})

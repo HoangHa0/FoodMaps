@@ -13,6 +13,9 @@ export const reviewsApi = {
     if (res.response.status === 404) return null;
     return unwrap(res);
   },
+  /** Reviews written on the website for one place, newest first. Guests allowed. */
+  list: async (placeId: string, limit = 20, offset = 0) =>
+    unwrap(await api.GET("/api/reviews", { params: { query: { place_id: placeId, limit, offset } } })),
   create: async (body: Schemas["ReviewIn"]) => unwrap(await api.POST("/api/reviews", { body })),
   update: async (reviewId: string, body: ReviewBody) =>
     unwrap(await api.PUT("/api/reviews/{review_id}", { params: { path: { review_id: reviewId } }, body })),

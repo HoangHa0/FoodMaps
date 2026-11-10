@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { Button, Sheet, Spinner } from "@/ui";
 
+import { groupApi } from "../api";
 import { useStoredParticipant, useSecondsLeft } from "../hooks/useClientState";
 import { useJoinRoom, useRoomActions } from "../hooks/useRoomActions";
 import { useRoomState } from "../hooks/useRoomState";
@@ -26,6 +28,13 @@ export function RoomScreen({ code }: { code: string }) {
   const { state, isLoading, error } = useRoomState(code, token);
   const { start, vote, finalize } = useRoomActions(code, token);
   const join = useJoinRoom(code);
+  // Before asking a visitor for a name: does the room exist, and can it still be joined?
+  const preview = useQuery({
+    queryKey: ["group", code, "preview"],
+    queryFn: () => groupApi.preview(code),
+    enabled: ready && !participant,
+    retry: (count, e) => !(e instanceof ApiError && e.status === 404) && count < 2,
+  });
   const secondsLeft = useSecondsLeft(state?.expires_at, state?.clockOffsetMs);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState("Chia sẻ link");
@@ -55,12 +64,42 @@ export function RoomScreen({ code }: { code: string }) {
 
   if (!participant) {
     const joinError = join.error instanceof ApiError ? join.error : undefined;
-    if (joinError?.code === "room_expired") return <Expired onNewRoom={newRoom} />;
-    if (joinError?.code === "room_not_found") return <NotFound onNewRoom={newRoom} />;
+    const previewError = preview.error instanceof ApiError ? preview.error : undefined;
+    if (previewError?.status === 404 || joinError?.code === "room_not_found") return <NotFound onNewRoom={newRoom} />;
+    if (preview.isPending) return <Loading />;
+    if (preview.isError)
+      return (
+        <Screen>
+          <MessageView
+            title="Không mở được phòng"
+            text={preview.error.message}
+            action={<Button onClick={() => void preview.refetch()}>Thử lại</Button>}
+          />
+        </Screen>
+      );
+    const room = preview.data;
+    if (room.status === "expired" || joinError?.code === "room_expired") return <Expired onNewRoom={newRoom} />;
+    if (!room.joinable || joinError?.code === "room_started" || joinError?.code === "room_full") {
+      const started = room.status !== "lobby" || joinError?.code === "room_started";
+      return (
+        <Screen>
+          <MessageView
+            title={started ? "Phòng đã bắt đầu bình chọn" : "Phòng đã đủ người"}
+            text={
+              started
+                ? `Phòng của ${room.host_name} không nhận thêm người. Bạn có thể tạo phòng mới cho nhóm mình.`
+                : `Phòng của ${room.host_name} đã có ${room.participant_count} người, không vào thêm được.`
+            }
+            action={<Button onClick={newRoom}>Tạo phòng mới</Button>}
+          />
+        </Screen>
+      );
+    }
     return (
       <Screen>
         <NameForm
-          title={`Vào phòng ${code}`}
+          title={`Vào phòng của ${room.host_name}`}
+          description={`Mã phòng ${room.code} · ${room.participant_count} người đã vào. Nhập tên để bạn bè biết bạn là ai, không cần tài khoản.`}
           submitLabel="Vào phòng"
           loading={join.isPending}
           error={joinError?.message}

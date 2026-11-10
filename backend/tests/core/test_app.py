@@ -49,3 +49,14 @@ async def test_todo_helper_returns_501_in_standard_format():
         r = await c.get("/unfinished")
     assert r.status_code == 501
     assert r.json()["error"] == {"code": "not_implemented", "message": "Chức năng đang được phát triển"}
+
+
+def test_local_database_skips_tls_and_every_database_has_a_connect_timeout():
+    from app.core.db import CONNECT_TIMEOUT_S, connect_args_for
+
+    local = connect_args_for("postgresql+asyncpg://u:p@localhost:5433/foodmaps", use_pgbouncer=False)
+    assert local == {"timeout": CONNECT_TIMEOUT_S, "ssl": False}
+    remote = connect_args_for(
+        "postgresql+asyncpg://u:p@aws-0.pooler.supabase.com:5432/postgres", use_pgbouncer=True
+    )
+    assert remote == {"timeout": CONNECT_TIMEOUT_S, "statement_cache_size": 0}

@@ -35,10 +35,11 @@ def _ids(body: dict) -> list[str]:
 
 
 async def test_too_far_puts_the_closest_remaining_place_first(db_client, seed_place):
-    rejected = await seed_place("rejected", cosine=0.6, meters_north=100)
-    near = await seed_place("near", cosine=0.45, meters_north=150)
+    # same mood match everywhere, so only the distance (and not "like the rejected place") orders them
+    rejected = await seed_place("rejected", cosine=0.5, meters_north=1900)  # the yardstick: 1.9 km away
+    near = await seed_place("near", cosine=0.5, meters_north=150)
     mid = await seed_place("mid", cosine=0.5, meters_north=900)
-    far = await seed_place("far", cosine=0.55, meters_north=1800)
+    far = await seed_place("far", cosine=0.5, meters_north=1800)
 
     r = await db_client.post("/api/match/reject", json=_body("too_far", rejected, [far, mid, near]))
 
@@ -51,14 +52,24 @@ async def test_too_far_puts_the_closest_remaining_place_first(db_client, seed_pl
     assert body["best"]["match_score"] > 0
 
 
-async def test_too_expensive_puts_the_cheapest_first(db_client, seed_place):
+async def test_too_expensive_puts_the_cheapest_first_and_drops_the_dearer(db_client, seed_place):
     rejected = await seed_place("rejected", price=120_000)
-    dear = await seed_place("dear", cosine=0.55, price=150_000)
+    dear = await seed_place("dear", cosine=0.55, price=150_000)  # dearer than the rejected one: dropped
+    mid = await seed_place("mid", cosine=0.52, price=100_000)
     cheap = await seed_place("cheap", cosine=0.50, price=30_000)
 
-    r = await db_client.post("/api/match/reject", json=_body("too_expensive", rejected, [dear, cheap]))
+    r = await db_client.post("/api/match/reject", json=_body("too_expensive", rejected, [dear, mid, cheap]))
 
-    assert _ids(r.json()) == [cheap, dear]
+    assert _ids(r.json()) == [cheap, mid]
+
+
+async def test_too_expensive_with_nothing_cheaper_gives_an_empty_answer(db_client, seed_place):
+    rejected = await seed_place("rejected", price=30_000)
+    dear = await seed_place("dear", cosine=0.55, price=60_000)
+
+    r = await db_client.post("/api/match/reject", json=_body("too_expensive", rejected, [dear]))
+
+    assert r.status_code == 200 and r.json() == {"best": None, "backups": []}
 
 
 async def test_too_crowded_puts_the_quietest_first(db_client, seed_place):
@@ -95,7 +106,7 @@ async def test_the_rejected_place_is_never_returned(db_client, seed_place):
     rejected = await seed_place("rejected", cosine=0.9)
     other = await seed_place("other")
 
-    r = await db_client.post("/api/match/reject", json=_body("too_far", rejected, [rejected, other]))
+    r = await db_client.post("/api/match/reject", json=_body("wrong_vibe", rejected, [rejected, other]))
 
     assert _ids(r.json()) == [other]
 
@@ -108,7 +119,7 @@ async def test_hard_filters_still_apply(db_client, seed_place):
 
     r = await db_client.post(
         "/api/match/reject",
-        json=_body("too_far", rejected, [inside, outside, too_dear], price_max=100_000),
+        json=_body("wrong_vibe", rejected, [inside, outside, too_dear], price_max=100_000),
     )
 
     assert _ids(r.json()) == [inside]
@@ -133,9 +144,9 @@ async def test_nothing_left_gives_an_empty_answer(db_client, seed_place):
 
 
 async def test_without_origin_the_distance_is_null_and_nothing_crashes(db_client, seed_place):
-    rejected = await seed_place("rejected")
+    rejected = await seed_place("rejected", cosine=0.6)
     a = await seed_place("a", cosine=0.6)
-    b = await seed_place("b", cosine=0.4)
+    b = await seed_place("b", cosine=0.5)
     body = _body("too_far", rejected, [b, a])
     body["criteria"].pop("origin")
 
