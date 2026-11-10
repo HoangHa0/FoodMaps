@@ -8,6 +8,8 @@ This document explains how to update restaurant and review data in the FoodMaps 
 
 ## 1. Prerequisites
 
+### Using Docker (local database)
+
 Make sure Docker is running and the FoodMaps database is available.
 
 From the project root:
@@ -15,6 +17,14 @@ From the project root:
 ```bash
 make db
 ```
+
+### Using a hosted database (Supabase) instead of Docker
+
+Enable the `postgis` and `vector` extensions in the Supabase dashboard and use the **Session pooler** connection string (port 5432; the direct connection is IPv6-only on the free plan) as `DATABASE_URL` with the `postgresql+asyncpg://` prefix.
+
+Keep `DB_USE_PGBOUNCER=false` in session mode. Run `make migrate`, then follow sections 2-5 below. Skip step 3.3 (it deletes rows through the local Docker container).
+
+Anyone holding the connection string has full access to the data, so share it privately and use this database only as the shared demo database.
 
 ## 2. Import Restaurant Data
 
