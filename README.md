@@ -357,11 +357,6 @@ make dev
 | Port 5432 already in use           | Stop the local PostgreSQL service, or change the port in`docker-compose.yml` and `DATABASE_URL`                                                  |
 | Cannot run Docker                  | Use a hosted PostgreSQL with the`postgis` and `vector` extensions (e.g. Supabase) and set `DATABASE_URL` with the `postgresql+asyncpg://` prefix |
 
-### Deploying online
-
-Free setup: **Vercel** (frontend) + **Hugging Face Space** (backend with the AI model) + **Supabase**
-(database). Step by step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
-
 ---
 
 ## 📁 Project Structure
