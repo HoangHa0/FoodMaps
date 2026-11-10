@@ -115,12 +115,19 @@ later changes that hook only.
 | Component     | Where                                       | Notes                                                                                                             |
 | ------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Frontend      | Vercel                                      | `BACKEND_URL` points at the backend                                                                               |
-| Backend       | Render / Railway / Fly.io, Singapore region | Run `alembic upgrade head` before start. Free instances sleep when idle: open the app a few minutes before a demo |
-| Demo database | Supabase, Singapore                         | Separate project from any development database                                                                    |
+| Backend       | Hugging Face Space (Docker, CPU basic)      | Free, 16 GB RAM. `alembic upgrade head` runs at container start. Sleeps after ~48 h idle: open the app before a demo |
+| Demo database | Supabase, **US region**                     | Next to the Space (the API makes several queries per request). Separate project from any development database     |
 
-AI Match (M3): sentence-transformers + torch need significant RAM and may exceed a free backend
-instance. Compute place embeddings **offline** (scripts in `data/`), encode only the user's query
-at runtime, prefer a small model, and measure memory early.
+AI Match (M3): sentence-transformers + torch need significant RAM. Compute place embeddings **offline**
+(`backend/scripts/compute_embeddings.py`), encode only the user's query at runtime.
+
+**Measured (2026-11):** the API uses about 85 MB without the model and about 1.2 GB once the
+`multilingual-e5-small` model has encoded a query. Render's free and Starter instances (512 MB) cannot
+hold it, and paid instances with 2 GB cost about $25/month; a Hugging Face Space gives 16 GB for free.
+Costs of that choice: the Space must be public (a Vercel rewrite cannot send a token), it runs in the
+US/EU (so the database moves to a US region), and it sleeps when idle. If a budget appears, Render or
+Railway in Singapore with ≥ 2 GB is the faster option for users in Vietnam; nothing in the code depends
+on the host. Step-by-step setup: `docs/DEPLOY.md`.
 
 ## D8. Repository organisation: monorepo, independent modules, auto-discovery
 
