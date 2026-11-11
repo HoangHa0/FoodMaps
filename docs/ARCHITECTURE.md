@@ -10,8 +10,8 @@ tested independently and only talk to each other through explicit contracts.
 foodmaps/
 ├── Makefile                         developer commands (make help)
 ├── docker-compose.yml               PostgreSQL 16 + PostGIS + pgvector for development
-├── backend/                         FastAPI · Python 3.12 · managed with uv
-│   ├── pyproject.toml, uv.lock      dependencies (optional extra "ai": sentence-transformers, Gemini)
+├── backend/                         FastAPI · Python 3.11 · managed with uv
+│   ├── pyproject.toml, uv.lock      dependencies (optional extra "ai": sentence-transformers)
 │   ├── alembic.ini
 │   ├── migrations/                  single migration history, timestamped file names
 │   │   ├── env.py                   loads the models of every module automatically
@@ -28,27 +28,33 @@ foodmaps/
 │   │       ├── match/         M3    AI Match: semantic search, Match Score
 │   │       ├── reviews/       M4    in-app reviews and Review Analysis
 │   │       ├── groups/        M5    Group Session
-│   │       ├── journey/       M6    Food Journey
-│   │       └── google_places/ M7    single gateway to Google Places + attribution rules
-│   ├── scripts/                     export_openapi.py, check_migrations.py, backup_db.py
+│   │       ├── journey/       M6    Food Journey: library and read-only share links
+│   │       ├── google_places/ M7    places read from our own database (map pins, place facts);
+│   │       │                        the name is historical, no Google API is called (D19)
+│   │       └── geo/                 address search: VietMap Autocomplete + Place, server side
+│   ├── scripts/                     import_places.py, import_reviews.py, backfill_place_prices.py,
+│   │                                compute_embeddings.py, generate_insights.py, eval_search.py,
+│   │                                try_*.py, export_openapi.py, check_migrations.py, backup_db.py
 │   └── tests/<module>/              tests grouped by module
 ├── frontend/                        Next.js (App Router) · TypeScript · Tailwind CSS v4
 │   ├── openapi.json                 GENERATED from the backend; never edit by hand
 │   ├── scripts/                     gen-api.mjs, check-design.mjs
 │   └── src/
 │       ├── app/                     routes: thin files that only compose features
-│       │   ├── page.tsx             home = map
+│       │   ├── page.tsx             home = Khám phá: map, AI Match search, place sidebar
 │       │   ├── (auth)/login, register
-│       │   ├── group/, group/[code]
-│       │   ├── journey/, me/
+│       │   ├── group/, group/[code] Ăn nhóm
+│       │   ├── journey/, journey/shared/[code]   Chuyến đi: planner and read-only share link
+│       │   ├── me/                  Đã lưu (saved places)
 │       │   └── dev/ui/, dev/reviews/  UI kit page; try the review form on any place_id
 │       ├── ui/                      design system: tokens, themes, primitive components
 │       ├── lib/api/                 typed API client generated from OpenAPI
 │       └── features/<name>/         index.ts (public) · api.ts · hooks/ · components/
-│           auth · group · taste · match · reviews · map · places · journey
+│           auth · explore · group · journey · map · match · places · reviews · saved · shell · taste
 ├── infra/db/                        Dockerfile for PostgreSQL + PostGIS + pgvector
-├── data/                            data collection and seeding scripts
-├── docs/                            this file and DECISIONS.md
+├── data/                            local data files (data/raw/ is ignored by Git)
+├── map/                             VietMap map style (style.json)
+├── docs/                            this file, DECISIONS.md, DATA_IMPORT.md and team/
 └── .github/workflows/ci.yml         CI on Linux and Windows
 ```
 
@@ -113,27 +119,37 @@ imports a feature only through its `index.ts`.
 - `npm run check:design` (part of `make lint`) rejects hard-coded colours and arbitrary Tailwind
   values for colour, radius and shadow in `src/features` and `src/app`.
 - `/dev/ui` shows every primitive on one page. `/dev/reviews` mounts `<ReviewForm>` on any `place_id`
-  until the place detail screen exists.
+  for trying the form on its own; on the home screen the same form opens from "Viết đánh giá" in the
+  place sidebar.
 
 ## 5. Contracts between modules
 
-| Contract                                          | Defined in                                                                             | Provided by   | Used by      |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------- | ------------ |
-| Current user                                      | `backend/app/shared/auth.py` (`CurrentUser`, `OptionalUser`)                           | M1            | M2, M4, M5   |
-| Candidate places                                  | `backend/app/shared/contracts.py` (`CandidateProvider`)                                | M3            | M5, M6       |
-| Place card (live name/photo/rating + attribution) | `GET /api/places/{place_id}/summary` and `<PlaceSummaryCard>` from `@/features/places` | M7            | M3, M4, M5   |
-| Login state in the frontend                       | `useMe()` from `@/features/auth`                                                       | M1            | all features |
-| UI primitives                                     | `@/ui` (component props)                                                               | design system | all features |
-| API errors                                        | `{"error": {"code", "message"}}` (`app/core/errors.py`, `lib/api/errors.ts`)           | core          | all          |
+| Contract                                              | Defined in                                                                              | Provided by    | Used by             |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------- | ------------------- |
+| Current user                                          | `backend/app/shared/auth.py` (`CurrentUser`, `OptionalUser`)                            | M1             | M2, M4, M5, M6      |
+| Candidate places                                      | `backend/app/shared/contracts.py` (`CandidateProvider`)                                 | M3             | M5, M6              |
+| Place data (name, category, address, price, position) | `backend/app/shared/places.py` (`get_place`, `get_places`, `get_places_near`)           | `places` table | M2, M3, M5, M6      |
+| Map pins and place facts over HTTP                    | `GET /api/places/map`, `GET /api/places/{place_id}/summary`                             | M7             | map, journey, saved |
+| Address search (suggestions, coordinates)             | `GET /api/geo/suggest`, `GET /api/geo/resolve`; `OriginPicker` from `@/features/places` | geo            | M3, M5              |
+| Login state in the frontend                           | `useMe()` from `@/features/auth`                                                        | M1             | all features        |
+| UI primitives                                         | `@/ui` (component props)                                                                | design system  | all features        |
+| API errors                                            | `{"error": {"code", "message"}}` (`app/core/errors.py`, `lib/api/errors.ts`)            | core           | all                 |
 
 Changing a contract is a separate pull request reviewed by the modules that use it.
 
-## 6. Google Maps Platform data rules
+## 6. Place data and maps
 
-- The database stores Google **place IDs** (allowed indefinitely) and, where needed, coordinates
-  with a `*_fetched_at` timestamp (refreshed at most every 30 days).
-- Place names, ratings, review texts and photos from Google are **fetched live** through
-  `modules/google_places` and never stored.
-- Hence tables such as `group_candidates` store only `place_id` plus our own data (score, tags and
-  the team's own name `places.manual_name`, DECISIONS D16); the UI renders Google names and photos
-  through the place-card contract above.
+All place data is our own.
+
+- The `places` table holds the 43 places the team curated: a `place_id` (the key every other table
+  points to), `manual_name`, category, address, coordinates, `google_maps_url` and
+  `price_per_person` (the median of the reviews). It is filled from `data/raw/places.csv` by
+  `scripts/import_places.py` (DATA_IMPORT.md).
+- Ratings, tags, dishes and summaries come from **our own reviews** (the team's form and the website)
+  and from the offline Groq job. Nothing is fetched live while a user browses.
+- Hence tables such as `group_candidates` and `journey_stops` store only `place_id` plus our own data;
+  names, categories and positions are read from `places` when a screen needs them.
+- **Map:** VietMap GL JS draws the map (`NEXT_PUBLIC_VIETMAP_TILE_KEY`, style in `map/style.json`).
+  **Address search** goes through the `geo` module, so the VietMap key stays on the server.
+- **Directions:** plain Google Maps links (`https://www.google.com/maps/dir/?api=1&...`). They need no
+  API key and open the Maps app on phones. Food Journey chains several links when a trip has many stops.

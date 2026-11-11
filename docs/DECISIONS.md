@@ -18,9 +18,9 @@ trade-offs, and when to revisit**. Add new decisions at the end; never delete ol
 
 **Decision:** PostgreSQL. M3 needs vectors, M2/M6 need geospatial queries and M5 needs
 transactions, and a query such as "places matching this mood, within 2 km, under 100k VND" runs
-as **one SQL statement** instead of stitching two or three systems together. With 100–300 places,
-an exact pgvector scan takes milliseconds, so no dedicated vector database (Qdrant, Pinecone) is
-needed.
+as **one SQL statement** instead of stitching two or three systems together. With 43 places (the
+current dataset), an exact pgvector scan takes milliseconds, and it would stay fast with a few
+hundred, so no dedicated vector database (Qdrant, Pinecone) is needed.
 
 **No Redis** for Group Session: the polling load is tiny (see D5) and PostgreSQL handles it. Redis
 would be one more service to deploy, back up and debug.
@@ -35,8 +35,8 @@ backups: check the current plan when creating the project and run `make backup` 
 
 - **Python is required** by sentence-transformers (M3), so the whole backend is Python; no
   separate microservice.
-- **FastAPI** over Django: lightweight, truly async (important for slow I/O to Google Places and
-  Gemini), and generates OpenAPI, from which the frontend types are generated (D3). Django's async
+- **FastAPI** over Django: lightweight, truly async (important for slow I/O to Groq and VietMap),
+  and generates OpenAPI, from which the frontend types are generated (D3). Django's async
   ORM support is partial, and its admin/templates would go unused.
 - **SQLAlchemy 2 async + asyncpg**: the fastest PostgreSQL driver for Python, with direct support
   for `pgvector` and `geoalchemy2` column types.
@@ -51,14 +51,15 @@ backups: check the current plan when creating the project and run `make backup` 
 
 - **Next.js rewrites** `/api/*` to FastAPI: the browser sees a single origin, so the httpOnly
   session cookie works without CORS or `SameSite=None`, and the backend URL is not exposed.
-  One-click deployment on Vercel.
+  It would also deploy to Vercel in one click, should hosting ever be needed (D7).
 - **TanStack Query**: caching, `refetchInterval` for polling (M5), automatic pause while the tab is
   hidden, optimistic updates for votes.
 - **openapi-typescript + openapi-fetch**: request/response types are generated from the backend,
   so a backend field change becomes a TypeScript error at build time, not a bug at demo time.
 - **Tailwind v4 with CSS-variable tokens**: the visual design can change without editing features
   (see ARCHITECTURE.md §4).
-- **Map: Google Maps JavaScript API.**
+- **Map: VietMap GL JS** (tiles and style), with address search through the backend. This line first
+  said "Google Maps JavaScript API"; **superseded by D19**.
 - `agentRules: false` in `next.config.ts` stops `next dev` from generating `AGENTS.md`/`CLAUDE.md`.
 
 ## D4. Authentication (M1): stateless JWT (HS256) in an httpOnly cookie
@@ -77,7 +78,9 @@ backups: check the current plan when creating the project and run `make backup` 
   another site cannot submit to it.
 - Passwords: `bcrypt` (cost 12), 8–72 characters (bcrypt ignores bytes after 72, so longer inputs
   are rejected rather than silently truncated). The `bcrypt` library is used directly; `passlib`
-  is unmaintained.
+  is unmaintained. **Known limit / planned:** the only rule is the length; a password with at
+  least one special character is planned. The rule will apply at registration only: login has no
+  format rules (`LoginIn`), so existing accounts keep working.
 - An `Authorization: Bearer <token>` header is also accepted, for Swagger UI and Postman.
 
 ## D5. Group Session real-time updates: HTTP polling with a version number
@@ -109,18 +112,27 @@ later changes that hook only.
 - If the member is logged in, their `user_id` is recorded as well (for future personal stats).
 - Voting locks the room row (`SELECT ... FOR UPDATE`) so two simultaneous final votes cannot
   decide a room twice.
+- **Known limits / planned.** A vote is an upsert, so a member can change it, but the room is decided
+  as soon as a majority (or everybody) has voted, so a wrong final vote cannot be corrected. A short
+  countdown after each vote is planned for this. A room lives 30 minutes and its votes are not kept
+  afterwards; saving the votes, and splitting the bill among the members after the vote, are planned.
 
-## D7. Deployment
+## D7. Deployment: hosting stays local
 
-| Component     | Where                                       | Notes                                                                                                             |
-| ------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Frontend      | Vercel                                      | `BACKEND_URL` points at the backend                                                                               |
-| Backend       | Render / Railway / Fly.io, Singapore region | Run `alembic upgrade head` before start. Free instances sleep when idle: open the app a few minutes before a demo |
-| Demo database | Supabase, Singapore                         | Separate project from any development database                                                                    |
+The app is run locally (`make dev`). An online setup (Vercel + a Hugging Face Space + Supabase) was
+tried and then removed again (commit `f8e66ea`); nothing in the code depends on the host, so it can
+be revisited.
 
-AI Match (M3): sentence-transformers + torch need significant RAM and may exceed a free backend
-instance. Compute place embeddings **offline** (scripts in `data/`), encode only the user's query
-at runtime, prefer a small model, and measure memory early.
+| Component | Where                                                         | Notes                                                                 |
+| --------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Frontend  | Local (`make dev`, port 3000)                                 | `BACKEND_URL` points at the backend                                   |
+| Backend   | Local (`make dev`, port 8000)                                 | Run `make migrate` first                                              |
+| Database  | Local Docker (`make db`) or the shared Supabase demo database | The demo database is a separate project from any development database |
+
+AI Match (M3): sentence-transformers + torch need significant RAM. Compute place embeddings **offline**
+(`backend/scripts/compute_embeddings.py`) and encode only the user's query at runtime. Measured by the
+team (2026-11): the API uses about 85 MB without the model and about 1.2 GB once
+`multilingual-e5-small` has encoded a query, so a free 512 MB instance cannot hold it.
 
 ## D8. Repository organisation: monorepo, independent modules, auto-discovery
 
@@ -168,12 +180,12 @@ the same input always gives the same output.
 **Decisions**
 
 - **Fixed calibration, not min-max.** MiniLM cosine is typically 0.2-0.6, so it cannot be shown as
-  a percentage. We map `0.15 → 0` and `0.60 → 1` (`SIM_LOW`, `SIM_HIGH`). Min-max inside the
+  a percentage. We mapped `0.15 → 0` and `0.60 → 1` (`SIM_LOW`, `SIM_HIGH`). **These numbers belong to
+  MiniLM: the default model is now e5 with 0.80 / 0.88 (D17).** Min-max inside the
   candidate group would always give the top place 100% and breaks with a single candidate. The two
   constants are meant to be tuned on real data (`scripts/try_match.py` prints the numbers).
-- **Rating comes from our own reviews** (sheet + web, `status = visible`), not from Google: Google
-  forbids storing ratings and calling it live for every candidate is slow and costs quota. The
-  score is a Bayesian average (prior 3.5, weight 3 reviews), so one 5-star review does not beat
+- **Rating comes from our own reviews** (sheet + web, `status = visible`); no Google data is used
+  (D19). The score is a Bayesian average (prior 3.5, weight 3 reviews), so one 5-star review does not beat
   ten 4.5-star reviews, and a place without reviews gets a neutral score instead of a penalty. The
   card shows the plain average and the review count.
 - **Radius and budget are hard filters**, applied before scoring, with no tolerance: a place
@@ -187,10 +199,9 @@ the same input always gives the same output.
   so the "Not Match" reroll needs no server-side state.
 - **Only the current embedding model is matched** (`model_name = EMBED_MODEL`): vectors from
   different models are not comparable.
-- **No Google data is stored or returned.** The API returns `place_id` and `name`, the team's own
-  name of the place (`places.manual_name`, typed by the team, not taken from Google), so a result
-  card has a title before M7 exists. The live Google name, photo and rating still come from the
-  google_places module (M7) with attribution.
+- **No Google data.** The API returns `place_id` and `name`, the team's own name of the place
+  (`places.manual_name`, typed by the team), so a result card always has a title. There is no live
+  Google name, photo or rating (D19).
 
 **Known limits.** Distance ignores real roads.
 
@@ -225,9 +236,11 @@ The client-side checks (`lib/validation.ts`) copy the limits of `schemas.py` onl
 backend stays the source of truth. A review the text filter flagged is saved normally and the form tells the
 author that only they can see it for now.
 
-**Not done yet (next tasks).** The place detail screen (M2/M7) still has to mount `<ReviewForm placeId=... />`; until then use `/dev/reviews`. Embeddings are recomputed offline (`scripts/compute_embeddings.py`),
-so a new website review changes search results only after the script is re-run. `pros` / `cons`
-of website reviews stay empty until an LLM job fills them (Review Analysis already reads them).
+**Where the form is used.** The place sidebar on the home screen mounts `<ReviewForm placeId=... />`
+from "Viết đánh giá" (guests log in first); `/dev/reviews` still mounts it on any `place_id` for testing.
+Embeddings are recomputed offline (`scripts/compute_embeddings.py`), so a new website review changes
+search results only after the script is re-run. `pros` / `cons` of website reviews stay empty in
+Review Analysis (plain code); the place-level pros/cons come from the Groq job (D13).
 
 ## D12. "Not Match" (M3): reorder the remaining backups, no new search, no server state
 
@@ -384,17 +397,18 @@ at the next regeneration, or at once with `--place Qxxx --force`.
 Before this, `CandidateProvider.find_candidates` returned only `place_id`, score and tags, so the vote cards
 showed "Quán #1" plus a raw place ID: the name that `/api/match` already returns (D10) was dropped on the way.
 
-| Decision                                                                          | Why                                                                                                                                                        |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PlaceCandidate.name` (optional) in `app/shared/contracts.py`                     | One field in the shared contract serves M5 and M6; `MatchResult` already inherits it. The stub provider carries the same sample names as `/api/match`      |
-| `group_candidates.name` stores a copy taken when the host starts the room         | It is `places.manual_name`, typed by the team, not Google data (D10), so storing it is allowed. A room lives 30 minutes: a snapshot is simpler than a join |
-| `CandidateOut.name` is `null` when the provider has no name                       | The UI falls back to "Quán #rank"                                                                                                                          |
-| The directions link uses the name as `destination` next to `destination_place_id` | Google routes by the place ID when it is a real one and falls back to the text                                                                             |
+| Decision                                                                          | Why                                                                                                                                                   |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PlaceCandidate.name` (optional) in `app/shared/contracts.py`                     | One field in the shared contract serves M5 and M6; `MatchResult` already inherits it. The stub provider carries the same sample names as `/api/match` |
+| `group_candidates.name` stores a copy taken when the host starts the room         | It is `places.manual_name`, typed by the team (D10, D19). A room lives 30 minutes: a snapshot is simpler than a join                                  |
+| `CandidateOut.name` is `null` when the provider has no name                       | The UI falls back to "Quán #rank"                                                                                                                     |
+| The directions link uses the name as `destination` next to `destination_place_id` | Google routes by the place ID when it is a real one and falls back to the text                                                                        |
 
 The host can also add an area: "Gần vị trí của tôi" sends the device position as `origin`, and only then are the
 radius chips shown, because the backend filters by distance from `origin` only.
 
-**Known limits.** The live Google name, photo and rating (M7 `PlaceSummaryCard`) are still missing from the cards.
+**Known limits.** The cards show the team's own name only: there is no photo or Google rating, because
+FoodMaps calls no Google API (D19).
 
 ## D17. AI Match (M3): hard rules and tag facets next to the embedding
 
@@ -474,3 +488,68 @@ places that fit it.
 - `BACKUP_COUNT` 3 -> 8. The server never searches again on "Không hợp", so the backups are the pool. 8 stays
   under `RejectIn.remaining` (10); 15-20 would be about half of the 40 places and the tail is not a match.
 - The rejected place is scored together with the backups (it is the yardstick) and then removed from the answer.
+
+## D19. Maps and place data: VietMap, our own data, no Google API, no TikTok, no Gemini
+
+**Supersedes** the early plan (the map line of D3, the "M7 Google Places gateway" and its attribution
+rules, TikTok captions as extra text for the embeddings, and Gemini as the LLM).
+
+**Decision**
+
+| Need                           | Chosen                                                                                        | Replaces                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Map                            | VietMap GL JS in the browser (`NEXT_PUBLIC_VIETMAP_TILE_KEY`, style in `map/style.json`)      | Google Maps JavaScript API                   |
+| Address search                 | VietMap Autocomplete v4 + Place v4, called by the `geo` module so the key stays on the server | -                                            |
+| Name, category, address, price | The `places` table, 43 places curated by the team (`data/raw/places.csv`, `import_places.py`) | Google Places API (live name, photo, rating) |
+| Rating, tags, dishes, summary  | Our own reviews (team form + website) and the offline Groq job (D13)                          | Google ratings and review texts              |
+| Text that is embedded          | Our own reviews only (`text_builder.py`, D17)                                                 | Reviews + TikTok captions                    |
+| LLM                            | Groq, offline (D13)                                                                           | Gemini                                       |
+| Directions                     | Plain Google Maps links (`/maps/dir/?api=1&...`), no API key                                  | -                                            |
+
+**Why.** The map and the address search are built for Vietnamese addresses; every field a screen shows
+is data we own, so there is no quota, no live call while users browse, no attribution rule and no
+`fetched_at` bookkeeping. TikTok was dropped as a data source: nothing collects or reads it any more.
+
+**Consequences**
+
+- No photos and no Google rating on a place; the rating on a card is the average of our own reviews.
+- `place_id` is only the key every table points to. Place names shown to users are `places.manual_name`.
+- The module `google_places` (M7) keeps its name and its endpoints (`/api/places/map`,
+  `/api/places/{place_id}/summary`) but only reads our database.
+- Still in the code as unused leftovers, safe to remove with a migration / cleanup: the column
+  `places.tiktok_urls` (always empty) with its field in the API schemas and in `import_places.py`, the
+  settings `GEMINI_API_KEY` and `GOOGLE_MAPS_API_KEY` in `core/config.py`, and the `google-genai`
+  package in the `ai` extra of `pyproject.toml`.
+
+## D20. Food Journey (M6): save = overwrite, share = snapshot, the draft lives in the browser
+
+A journey is an ordered list of stops (a place, an optional time and an optional note) with an
+optional title and date. Backend: `modules/journey`; frontend: `features/journey`, pages `/journey`
+and `/journey/shared/[code]`.
+
+| Decision                                                                                                                                                                                                               | Why                                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Saving **overwrites the whole journey**: `POST` creates, `PUT /{id}` replaces title, date and all stops in one transaction                                                                                             | One call covers adding, deleting, reordering and editing a stop, so there are no per-stop endpoints and reordering by buttons needs nothing special from the server                                                                        |
+| A stop stores only `place_id`, time and note                                                                                                                                                                           | Name, category, address and position are read from `places` (D19), so a place edited in the data shows correctly in every journey. A place removed from the data makes its stops disappear (`ON DELETE CASCADE`)                           |
+| The library (`GET/POST/PUT/DELETE /api/journeys`) needs login and only sees the caller's journeys; another user's id answers 404                                                                                       | A 404 does not reveal that the journey exists                                                                                                                                                                                              |
+| Limits (`constants.py`): 20 journeys per account (409 `journey_limit`), 20 stops, title 100 and note 300 characters                                                                                                    | Keeps one account small. Creating a journey takes a per-user advisory lock (`pg_advisory_xact_lock`), so two simultaneous requests cannot both pass the limit                                                                              |
+| A **share link** is a read-only snapshot (JSONB) behind a random code (`secrets.token_urlsafe(8)`), valid **7 days**, created without login (`POST /api/journeys/shares`, read with `GET /api/journeys/shares/{code}`) | A guest can share a plan without an account; the code is unguessable, and a wrong or expired code both answer 404. The snapshot belongs to nobody and expires independently of the journey (deleting the journey does not remove the link) |
+| Link creation is limited to 10 per hour per address (429); the address is stored only as a keyed hash (HMAC-SHA256 with the JWT secret)                                                                                | Stops abuse without keeping IP addresses. The address is the first entry of `X-Forwarded-For`, which anyone can fake, so this reduces abuse but cannot stop it. Expired snapshots are deleted on the next "create link" request            |
+| The journey being edited is a **draft in `localStorage`** (`foodmaps.journeyDraft`) until it is saved                                                                                                                  | A guest can plan with no account, a reload loses nothing, and "Thêm vào chuyến đi" in the home sidebar can add a stop from anywhere. A revision counter keeps edits made during a save marked as "changed"                                 |
+| Distances are **straight lines** (haversine); walking time = distance × 1.3 detour ÷ 75 m per minute, always shown as an estimate                                                                                      | No routing service is needed. Real roads can be longer: see the known limits                                                                                                                                                               |
+| Cost is the sum of the known `price_per_person`; stops without a price are counted separately instead of as 0                                                                                                          | The total never pretends to know a price it does not have                                                                                                                                                                                  |
+| A stop whose time is earlier than a stop before it gets a warning (no automatic reorder)                                                                                                                               | The user decides; the list order is the plan                                                                                                                                                                                               |
+| Directions are Google Maps **walking** links through every stop. A link holds 11 points (origin, destination, 9 waypoints), so longer journeys are split into chained links that share their end points                | No API key and nothing to host (D19); 20 stops need 2 links                                                                                                                                                                                |
+
+**Known limits.** Distance and walking time ignore the real street network. A share link shows the
+journey as it was when the link was made. Group Session and AI Match do not yet add their results to a
+journey automatically: a stop is added from a place's sidebar or by name search in the planner.
+
+**Planned (see Future Improvements in the README).**
+
+- **Sort by time:** today a stop with an earlier time than the stop before it only gets a warning and
+  the user reorders by hand; sorting the stops by time automatically is planned.
+- **Progress:** nothing records which stops were already visited; tracking this is planned.
+- **Money:** only the estimated cost per person is shown, as the sum of `price_per_person`. A budget
+  with a warning when the estimate goes over it, and splitting the cost by restaurant and among the
+  members of a group, are planned.

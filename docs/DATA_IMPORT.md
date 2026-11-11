@@ -40,14 +40,30 @@ Use this exact file path and file name: `data/raw/places.csv`
 
 **Important:** Do not rename the file or place it in another directory unless the import command is updated accordingly.
 
-Run the Places import script from the `backend/` directory:
+The file has one row per place (43 at the moment), curated by the team. FoodMaps calls no Google API and
+takes no data from TikTok, so every value below is typed or collected by the team:
+
+| Column            | Required | Meaning                                                            |
+| :---------------- | :------: | :----------------------------------------------------------------- |
+| `place_code`      |   yes    | Short code of the place used in the team's data (e.g. `Q001`)      |
+| `manual_name`     |   yes    | The name shown to users                                            |
+| `category`        |   yes    | Category used by the map filter and by search (e.g. café, quán ăn) |
+| `place_id`        |   yes    | Unique ID of the place; every other table points to it             |
+| `lat`, `lng`      |   yes    | Position (a comma as the decimal separator is accepted)            |
+| `address`         |    no    | Address shown in the sidebar                                       |
+| `google_maps_url` |    no    | Link behind "Mở trên Google Maps"                                  |
+
+The importer still reads an old `tiktok_urls` column if the file has one, but it is no longer used: leave it empty or remove it.
+
+Run the Places import script from the `backend/` directory (add `--dry-run` first to check the file):
 
 ```bash
 cd backend
+uv run python scripts/import_places.py ../data/raw/places.csv --dry-run
 uv run python scripts/import_places.py ../data/raw/places.csv
 ```
 
-After importing, verify that the expected restaurant records are present in the database.
+After importing, verify that the expected restaurant records (43) are present in the database.
 
 ## 3. Import Review Data
 
@@ -210,9 +226,11 @@ Update source data
           Run --dry-run (Compute Embeddings)
               ↓
           Run actual compute embeddings (compute_embeddings.py)
+              ↓
+          Run --dry-run (AI insights), then generate_insights.py   (section 9)
 ```
 
-For reviews, price backfilling, and embeddings, always run the `--dry-run` version before the real import/update.
+For reviews, price backfilling, embeddings, and AI insights, always run the `--dry-run` version before the real import/update.
 
 ## 8. Important Notes
 
@@ -223,7 +241,7 @@ For reviews, price backfilling, and embeddings, always run the `--dry-run` versi
 - User-submitted reviews (`source = 'user'`) must not be deleted during the sheet import process.
 - If any import script reports errors during `--dry-run`, fix the source data or script before running the real import.
 
-## 5. Generate AI insights (pros/cons, FAQ, highlights, summary)
+## 9. Generate AI insights (pros/cons, FAQ, highlights, summary)
 
 Run this after reviews changed. It calls Groq, so it needs a key and uses a daily quota. Two calls per place
 (`docs/DECISIONS.md` D13): the main call reads **all** reviews (pros/cons, FAQ, highlights for "Why this place");
