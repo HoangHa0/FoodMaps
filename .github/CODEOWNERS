@@ -1,35 +1,81 @@
-# Replace @TODO-* with real GitHub usernames, then enable "Require review from Code Owners"
+# CODEOWNERS và Ownership (FoodMaps)
+
+Hai phần dưới đây nằm trong `docs/team/README.md` (bảng Ownership) và `.github/CODEOWNERS` (khối code).
+File thật `.github/CODEOWNERS` phải **không có đuôi**; bản `.md` này chỉ để đọc.
+
+## Ownership
+
+| Member                                   | What they built                                                                                                                                                                                                                                                                                                                                                            | Backend (`backend/app/modules/`)                                                                   | Frontend (`frontend/src/`)                                                                                                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: Hoang Thi Le Xuan (AI & data)         | Database schema and migrations (PostgreSQL, pgvector) and data import; M3 AI Match (semantic search, hard rules, tag facets, Match Score, "Không hợp" re-ranking, "Why this place?"); M4 Reviews (API with moderation, rate limit and reports, Review Analysis, website reviews in the place details); offline Groq insights; `geo` module for VietMap address suggestions | `match/`, `reviews/`, `geo/`, plus `backend/migrations/`, `backend/scripts/`, `infra/` and `data/` | `features/reviews/`, `OriginPicker` in `features/places/` (used by AI Match and Group Session), content of `features/match/`                                                                  |
+| B: Pham Thuy Anh (Maps & Journey)        | M2 Saved places and custom pins (a saved list's icon becomes the pin on the map); VietMap integration: the interactive map in the browser, its custom map style (`map/style.json`), pins and place search; M6 Food Journey; M7 Places (our own place data)                                                                                                                 | `saved_places/`, `journey/`, `google_places/`                                                      | `features/map/`, `features/journey/`, `features/places/`, `features/saved/`, `features/explore/` (with C), plus `map/`                                                                        |
+| C: Nguyen Hoang Ha (Accounts, UI, Group) | M1 Authentication (back-end and front-end); M5 Group Session (back-end and UI); design system, app shell and the AI Match search interface; repository setup and CI                                                                                                                                                                                                        | `auth/`, `groups/`                                                                                 | `ui/`, `features/auth/`, `features/group/`, `features/shell/`, `features/taste/`, `features/explore/` (with B), UI of `features/match/`, plus `Makefile`, `docker-compose.yml` and `.github/` |
+| Everyone (cross-review)                  | Code that changes things for all of us                                                                                                                                                                                                                                                                                                                                     | `core/`, `shared/`, `migrations/env.py`                                                            | `lib/`, `docs/`                                                                                                                                                                               |
+
+## CODEOWNERS
+
+```markdown
+# Replace @TODO-\* with real GitHub usernames, then enable "Require review from Code Owners"
+
 # in the branch protection rule for main. Later lines override earlier ones.
-*                                   @TODO-member-C
 
-# ---- Member A: M3 (AI Match) + M4 (Reviews)
-/backend/app/modules/match/         @TODO-member-A
-/backend/app/modules/reviews/       @TODO-member-A
-/frontend/src/features/reviews/     @TODO-member-A
-/data/                              @TODO-member-A
+# Member A = Hoang Thi Le Xuan, Member B = Pham Thuy Anh, Member C = Nguyen Hoang Ha.
 
-# ---- Member B: M2 (Map & saved places) + M6 (Journey) + M7 (Google compliance)
-/backend/app/modules/saved_places/  @TODO-member-B
-/backend/app/modules/journey/       @TODO-member-B
+# Repository setup and CI (Makefile, docker-compose.yml, .github/) are C's: that is the default below.
+
+-                                   @TODO-member-C
+
+# ---- Member A: database + data, M3 (AI Match), M4 (Reviews), geo (address search)
+
+/backend/app/modules/match/ @TODO-member-A
+/backend/app/modules/reviews/ @TODO-member-A
+/backend/app/modules/geo/ @TODO-member-A
+/backend/migrations/ @TODO-member-A
+/backend/scripts/ @TODO-member-A
+/frontend/src/features/reviews/ @TODO-member-A
+/infra/ @TODO-member-A
+/data/ @TODO-member-A
+
+# ---- Member B: M2 (Saved places), M6 (Journey), M7 (Places data), VietMap map and style
+
+/backend/app/modules/saved_places/ @TODO-member-B
+/backend/app/modules/journey/ @TODO-member-B
 /backend/app/modules/google_places/ @TODO-member-B
-/frontend/src/features/map/         @TODO-member-B
-/frontend/src/features/journey/     @TODO-member-B
-/frontend/src/features/places/      @TODO-member-B
+/frontend/src/features/map/ @TODO-member-B
+/frontend/src/features/journey/ @TODO-member-B
+/frontend/src/features/places/ @TODO-member-B
+/frontend/src/features/saved/ @TODO-member-B
+/map/ @TODO-member-B
 
-# ---- Member C: M1 (Auth) + M5 (Group Session) + UI / design system
-/backend/app/modules/auth/          @TODO-member-C
-/backend/app/modules/groups/        @TODO-member-C
-/frontend/src/ui/                   @TODO-member-C
-/frontend/src/features/auth/        @TODO-member-C
-/frontend/src/features/group/       @TODO-member-C
-/frontend/src/features/taste/       @TODO-member-C
+# OriginPicker (address picker used by AI Match and Group Session) was built by A.
+
+/frontend/src/features/places/components/OriginPicker.tsx @TODO-member-A @TODO-member-B
+
+# ---- Member C: M1 (Auth), M5 (Group Session), UI / design system / app shell
+
+/backend/app/modules/auth/ @TODO-member-C
+/backend/app/modules/groups/ @TODO-member-C
+/frontend/src/ui/ @TODO-member-C
+/frontend/src/features/auth/ @TODO-member-C
+/frontend/src/features/group/ @TODO-member-C
+/frontend/src/features/shell/ @TODO-member-C
+/frontend/src/features/taste/ @TODO-member-C
+
 # Match UI: C builds the interface, A owns the content and API, so both review.
-/frontend/src/features/match/       @TODO-member-C @TODO-member-A
+
+/frontend/src/features/match/ @TODO-member-C @TODO-member-A
+
+# Explore (home screen): puts B's map and C's search interface together, so both review.
+
+/frontend/src/features/explore/ @TODO-member-B @TODO-member-C
 
 # ---- Shared code: changes affect everyone, so everyone reviews
-/backend/app/core/                  @TODO-member-A @TODO-member-B @TODO-member-C
-/backend/app/shared/                @TODO-member-A @TODO-member-B @TODO-member-C
-/backend/migrations/env.py          @TODO-member-A @TODO-member-B @TODO-member-C
-/frontend/src/lib/                  @TODO-member-A @TODO-member-B @TODO-member-C
-/Makefile                           @TODO-member-A @TODO-member-B @TODO-member-C
-/.github/workflows/                 @TODO-member-A @TODO-member-B @TODO-member-C
+
+/backend/app/core/ @TODO-member-A @TODO-member-B @TODO-member-C
+/backend/app/shared/ @TODO-member-A @TODO-member-B @TODO-member-C
+/backend/migrations/env.py @TODO-member-A @TODO-member-B @TODO-member-C
+/frontend/src/lib/ @TODO-member-A @TODO-member-B @TODO-member-C
+/docs/ @TODO-member-A @TODO-member-B @TODO-member-C
+/Makefile @TODO-member-A @TODO-member-B @TODO-member-C
+/.github/workflows/ @TODO-member-A @TODO-member-B @TODO-member-C
+```
