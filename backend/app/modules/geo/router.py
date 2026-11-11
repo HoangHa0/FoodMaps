@@ -21,6 +21,6 @@ async def suggest(q: Annotated[str, Query(max_length=100, description="what the 
 
 
 @router.get("/resolve", response_model=GeoPoint, responses={404: {}, 503: {}})
-async def resolve(ref_id: Annotated[str, Query(min_length=1, max_length=255)]):
+async def resolve(ref_id: Annotated[str, Query(min_length=1, max_length=2048)]):
     """Coordinates of the suggestion the user picked (404 `not_found` when the id is unknown)."""
     return await service.resolve(ref_id)

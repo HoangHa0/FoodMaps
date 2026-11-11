@@ -140,6 +140,16 @@ async def test_resolve_returns_the_coordinates_and_passes_the_ref_id_unchanged(c
     assert params["apikey"] == KEY
 
 
+async def test_resolve_accepts_long_vietmap_ref_ids(client, monkeypatch):
+    ref_id = "vm:ADDRESS:" + "A" * 400
+    seen = _mock_vietmap(monkeypatch, lambda r: httpx.Response(200, json={"lat": 21.0, "lng": 105.0}))
+
+    res = await client.get("/api/geo/resolve", params={"ref_id": ref_id})
+
+    assert res.status_code == 200
+    assert dict(seen[0].url.params)["refid"] == ref_id
+
+
 @pytest.mark.parametrize(
     "body",
     [{}, {"lat": None, "lng": None}, {"lat": "21.0", "lng": "105.8"}, {"lat": 95.0, "lng": 105.8}, []],
